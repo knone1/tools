@@ -1,0 +1,2 @@
+echo "find . -name $2 -exec $1 {} $3\;"
+find . -name $2 -exec $1 {} $3\;

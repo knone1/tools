@@ -1,0 +1,7 @@
+make CROSS_COMPILE=~/arm-2010q1/bin/arm-none-linux-gnueabi- omap4430sdp_config
+make CROSS_COMPILE=~/arm-2010q1/bin/arm-none-linux-gnueabi- ift
+#cp ./x-load.bin ./omap-mshield-lite
+#cd ./omap-mshield-lite
+#./generate_MLO ES2.2 ./x-load.bin
+#cp ./MLO ..
+#cd ..

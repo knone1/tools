@@ -1,0 +1,18 @@
+#!/bin/bash
+HEXSTART=$1
+HEXEND=$1
+
+let NUM1=0x$HEXSTART
+let NUM2=0x$HEXEND
+
+NUM3=$[$NUM1-2048]
+NUM4=$[$NUM2+2048]
+
+NUM5=$(printf "%x\n" $NUM3)
+NUM6=$(printf "%x\n" $NUM4)
+
+echo "start "$NUM5
+echo "end "$NUM6
+
+
+~/arm-2010q1/bin/arm-none-linux-gnueabi-objdump  -dS --start-address=0x$NUM5 --stop-address=0x$NUM6 ./vmlinux>./dump_intermix.txt

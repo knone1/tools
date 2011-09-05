@@ -1,0 +1,2 @@
+rm fslink
+ln -s $1 fslink

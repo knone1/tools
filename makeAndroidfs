@@ -1,0 +1,16 @@
+MYDROID=/home/axel/froyocode2
+cd $MYDROID
+rm -rf myfs
+mkdir myfs
+cd myfs
+cp -Rfp $MYDROID/out/target/product/blaze/root/* .
+cp -Rfp $MYDROID/out/target/product/blaze/system/ .
+cp -Rfp $MYDROID/out/target/product/blaze/data/ .
+mv init.rc init.rc.bak
+cp -Rfp $MYDROID/device/ti/blaze/init.omap4sdp.rc init.rc
+
+chmod 777 * -R
+rm -rf ~/export/myfs/*
+cp -rf * ~/export/myfs/
+cd ~/export/myfs/
+chmod 777 * -R

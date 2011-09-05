@@ -1,0 +1,24 @@
+rm ~/bin/uImage
+rm ./arch/arm/boot/uImage
+rm ./arch/arm/boot/zImage
+
+if [ -n "$1" ]; then
+ARG1=$1
+else
+ARG1=uImage
+fi
+
+if [ $ARG1 = "mc" ];then
+ARG1=menuconfig
+fi
+make  -j4 ARCH=arm CROSS_COMPILE=/home/axelh/arm-2010q1/bin/arm-none-linux-gnueabi- $ARG1
+
+if [ ! -f ./arch/arm/boot/uImage ]; then
+	echo "KERNEL BUILD FAILED!!"
+	exit
+fi
+
+cp ./arch/arm/boot/uImage ~/bin/
+cp ./arch/arm/boot/zImage ~/bin/
+
+emmcMake -ftk

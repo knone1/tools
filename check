@@ -1,0 +1,2 @@
+git show > ./check.patch
+./scripts/checkpatch.pl check.patch
