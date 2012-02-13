@@ -1,9 +1,27 @@
 #!/bin/sh
+#
+# BEGIN -- UMG Customization
+#
+# Turn off proxy, if set, because this screws up Python urlopen method
+# (And does this need to be semantically legal in Python? unset does not work)
 
-## repo default configuration
-##
-REPO_URL='git://android.git.kernel.org/tools/repo.git'
-REPO_REV='stable'
+http_proxy=''
+HTTP_PROXY=''
+
+# repo default configuration
+#
+# REPO_URL='git://android.git.kernel.org/tools/repo.git'
+# REPO_REV='stable'
+
+REPO_URL='ssh://jfumgrepo1.jf.intel.com:29418/admin/repo.git'
+REPO_REV="master"
+#
+# END -- UMG Customization
+
+
+
+
+
 
 # Copyright (C) 2008 Google Inc.
 #
@@ -136,6 +154,10 @@ group.add_option('--no-repo-verify',
                  dest='no_repo_verify', action='store_true',
                  help='do not verify repo source code')
 
+group = init_optparse.add_option_group('Other options')
+group.add_option('--config-name',
+                 dest='config_name', action="store_true", default=False,
+                 help='Always prompt for name/e-mail')
 
 class CloneFailure(Exception):
   """Indicate the remote clone of repo itself failed.
@@ -180,10 +202,16 @@ def _Init(args):
 
   _CheckGitVersion()
   try:
-    if _NeedSetupGnuPG():
-      can_verify = _SetupGnuPG(opt.quiet)
-    else:
-      can_verify = True
+
+# UMG special - just turn this off for now
+#
+#    if _NeedSetupGnuPG():
+#      can_verify = _SetupGnuPG(opt.quiet)
+#    else:
+#      can_verify = True
+
+    can_verify = False
+
 
     if not opt.quiet:
       print >>sys.stderr, 'Getting repo ...'
