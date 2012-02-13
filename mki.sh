@@ -1,11 +1,17 @@
 DIR=~/r3
-R2_DIR=~/r2
-R3_DIR=~/r3
 OUT=out/target/product/mfld_pr2
-R2_RELEASE=2012_WW04
+
+# R3 INFO #
+R3_DIR=~/r3
 R3_RELEASE=2012WW04
-R2_MANIFEST=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases/2012_WW04/manifest-2012_WW04-generated.xml
-R3_MANIFEST=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases/2012WW04/manifest-2012WW04-generated.xml
+R3_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
+R3_MANIFEST=$R3_URL/$R3_RELEASE/manifest-$R3_RELEASE-generated.xml
+
+# R2 INFO #
+R2_DIR=~/r2
+R2_RELEASE=2012_WW04
+R2_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases
+R2_MANIFEST=$R2_URL/$R2_RELEASE/manifest-$R2_RELEASE-generated.xml
 
 #START A FULL BUIL
 print(){
@@ -13,6 +19,7 @@ print(){
 	echo $1
 	echo "#######################################################"
 }
+
 full_andrid_build(){
 	cd $DIR
         source build/envsetup.sh
@@ -31,7 +38,6 @@ build_boottarball(){
 	source build/envsetup.sh
 	lunch mfld_pr2-eng
 	make -j4 boottarball	
-
 }
 
 build_r3(){
@@ -87,6 +93,7 @@ set_dir(){
 	cd $DIR
 
 }
+
 build_kernel(){
 	reboot
 	print "BUILDING $1"
@@ -125,12 +132,11 @@ flash(){
 	
         sudo fastboot flash boot boot.bin
         sudo fastboot flash recovery recovery.img
-#        sudo fastboot flash radio radio_firmware.bin
+        sudo fastboot flash radio radio_firmware.bin
         sudo fastboot erase system
         sudo fastboot flash system system.tar.gz
         sudo fastboot flash dnx SIGNED_PNW_C0_D0_FWR_DnX.FD.24.bin
         sudo fastboot flash ifwi IFWI_v02.16_CRAK.bin
-
 
 }
 
@@ -153,24 +159,24 @@ get(){
 	#GET IMAGE
 	case $1 in 
 	r2)
-		wget -r -l1 --no-parent -A"*fastboot*.zip" http://jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases/$R2_RELEASE/MFLD_PRx/flash_files/build-eng/	
-		mv jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases/$R2_RELEASE/MFLD_PRx/flash_files/build-eng/* .
+		wget -r -l1 --no-parent -A"*fastboot*.zip" http://$R2_URL/$R2_RELEASE/MFLD_PRx/flash_files/build-eng/	
+		mv $R2_URL/$R2_RELEASE/MFLD_PRx/flash_files/build-eng/* .
 		rm -rf jfumgbuild-depot.jf.intel.com
 		cd IMAGE unzip ../*fastboot*.zip
 	
 		#BLANK PHONE
-		wget -r -l1 --no-parent -A"*PR3.1*.zip" http://jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases/$R2_RELEASE/MFLD_PRx/flash_files/blankphone/
-		mv jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases/$R2_RELEASE/MFLD_PRx/flash_files/blankphone/* . 
+		wget -r -l1 --no-parent -A"*PR3.1*.zip" http://$R2_URL/releases/$R2_RELEASE/MFLD_PRx/flash_files/blankphone/
+		mv $R2_URL/$R2_RELEASE/MFLD_PRx/flash_files/blankphone/* . 
 		rm -rf jfumgbuild-depot.jf.intel.com ;;
 	r3)
-		wget -r -l1 --no-parent -A"*PR3.1*.zip"  http://jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases/$R3_RELEASE/MFLD_PRx/flash_files/build-eng/
-	        mv jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases/$R3_RELEASE/MFLD_PRx/flash_files/build-eng/* .
+		wget -r -l1 --no-parent -A"*PR3.1*.zip"  http://$R3_URL/$R3_RELEASE/MFLD_PRx/flash_files/build-eng/
+	        mv $R3_URL/$R3_RELEASE/MFLD_PRx/flash_files/build-eng/* .
         	rm -rf jfumgbuild-depot.jf.intel.com
 		cd IMAGE
 		unzip ../*PR3.1*.zip
 	        #BLANK PHONE
-        	wget -r -l1 --no-parent -A"*PR3.1*.zip" http://jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases/$R3_RELEASE/MFLD_PRx/flash_files/blankphone/
-	        mv jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases/$R3_RELEASE/MFLD_PRx/flash_files/blankphone/* .
+        	wget -r -l1 --no-parent -A"*PR3.1*.zip" http://$R3_URL/$R3_RELEASE/MFLD_PRx/flash_files/blankphone/
+	        mv $R3_URL/$R3_RELEASE/MFLD_PRx/flash_files/blankphone/* .
         	rm -rf jfumgbuild-depot.jf.intel.com 
 	;;
 	esac
