@@ -69,7 +69,7 @@ full_andrid_build(){
 
         source build/envsetup.sh
         lunch $PLATFORM-eng
-        make  $PLATFORM
+        make -j8  $PLATFORM
 }
 
 build_boottarball(){
