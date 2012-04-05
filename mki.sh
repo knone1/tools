@@ -8,7 +8,7 @@ R3_MANIFEST=$R3_URL/$R3_RELEASE/manifest-$R3_RELEASE-generated.xml
 
 # R2 INFO #
 R2_DIR=~/r2
-R2_RELEASE=2012_WW11
+R2_RELEASE=2012_WW13
 R2_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases
 R2_MANIFEST=$R2_URL/$R2_RELEASE/manifest-$R2_RELEASE-generated.xml
 
@@ -20,6 +20,7 @@ CV_MANIFEST=$CV_URL/$CV_RELEASE/manifest-$CV_RELEASE-generated.xml
 
 
 PLATFORM=ctp_pr0
+PLATFORM=mfld_pr2
 OUT=out/target/product
 OUT_PLATFORM=$OUT/$PLATFORM
 
@@ -66,10 +67,9 @@ full_andrid_build(){
 		;;
 	*)exit 1;;
 	esac
-
         source build/envsetup.sh
         lunch $PLATFORM-eng
-        make -j8  $PLATFORM
+	vendor/intel/support/build_all.sh -c $PLATFORM
 }
 
 build_boottarball(){
@@ -133,9 +133,8 @@ flash_kernel()
 	set_dir $1
 	cd $DIR
 	print "FLASH"
-	sudo fastboot flash boot $DIR/$OUT/boot.bin
+	sudo fastboot flash boot $DIR/$OUT/$PLATFORM/boot.bin
 	sudo fastboot continue
-	flash_boot
 }
 
 #GET DAILY BUILD AND FLASHIT
@@ -188,9 +187,9 @@ get(){
 
 build_all(){
 	
-	print "BUILD ctp_pr0-eng"
-	vendor/intel/support/build_all.sh -c ctp_pr0
-	mv ./out ./out_ctp_pr0
+#	print "BUILD ctp_pr0-eng"
+#	vendor/intel/support/build_all.sh -c ctp_pr0
+#	mv ./out ./out_ctp_pr0
 
 	print "BUILD mfld_pr2"
         vendor/intel/support/build_all.sh -c mfld_pr2
@@ -224,9 +223,6 @@ sync(){
 
 scratch()
 {
-	set_dir $1
-	cd $DIR
-	
 	print "SCRATCH $1"
 
 	case $1 in 
@@ -245,8 +241,12 @@ scratch()
 	*)exit 1;;
 	esac
 
+	if [ "$2" = "-f" ] ; then
+		rm -rf $NEW_BUILD_DIR
+	fi
+
 	if [ -e $NEW_BUILD_DIR ]; then
-		print "$RELEASE BUILD EXISTS PLEASE REMOVE IT."
+		print "$RELEASE BUILD EXISTS PLEASE REMOVE IT. or use -f"
 		exit
 	fi
 
@@ -354,7 +354,7 @@ make_shit2(){
 	cd $R3_DIR
 	adb root
 	adb remount
-	adb push out/target/product/mfld_pr2/system/lib/libandroid_servers.so /system/lib/libandroid_servers.so
+#	adb push out/target/product/mfld_pr2/system/lib/libandroid_servers.so /system/lib/libandroid_servers.so
 	adb push out/target/product/mfld_pr2/system/framework/services.jar /system/framework/services.jar
 	adb reboot
 
@@ -381,7 +381,7 @@ while [ ! -z "$1" ]; do
 		full_andrid_build $2;
 		break;;
 	-g)
-		scratch $2
+		scratch $2 $3
 		break;;
 	-p)
 		make_package $2
