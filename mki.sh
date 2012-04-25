@@ -1,20 +1,22 @@
+http_proxy=
+
 DIR=~/r3
 
 # R3 INFO #
 R3_DIR=~/r3
-R3_RELEASE=2012_WW11
+R3_RELEASE=2012_WW15
 R3_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 R3_MANIFEST=$R3_URL/$R3_RELEASE/manifest-$R3_RELEASE-generated.xml
 
 # R2 INFO #
 R2_DIR=~/r2
-R2_RELEASE=2012_WW13
+R2_RELEASE=2012_WW14
 R2_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases
 R2_MANIFEST=$R2_URL/$R2_RELEASE/manifest-$R2_RELEASE-generated.xml
 
 # R3 INFO #
 CV_DIR=~/r3
-CV_RELEASE=2012_WW11
+CV_RELEASE=2012_WW15
 CV_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 CV_MANIFEST=$CV_URL/$CV_RELEASE/manifest-$CV_RELEASE-generated.xml
 
@@ -27,8 +29,8 @@ OUT_PLATFORM=$OUT/$PLATFORM
 rm -rf $R2_DIR
 rm -rf $R3_DIR
 
-ln -s /home/axelh/RELEASES/R3/$R3_RELEASE ~/r3
-ln -s /home/axelh/RELEASES/R2/$R2_RELEASE ~/r2
+ln -s ~/RELEASES/R3/$R3_RELEASE ~/r3
+ln -s ~/RELEASES/R2/$R2_RELEASE ~/r2
 
 
 #START A FULL BUIL
@@ -233,6 +235,9 @@ scratch()
 	r3)	NEW_BUILD_DIR=~/RELEASES/R3/$R3_RELEASE
 		RELEASE=$R3_RELEASE
 		MANIFEST=$R3_MANIFEST
+		if [ -ne ~/RELEASES/R3 ];then
+			mkdir -p ~/RELEASES/R3
+		fi
 		;;
 	cv)     NEW_BUILD_DIR=~/RELEASES/R3/$CV_RELEASE
 		RELEASE=$CV_RELEASE
