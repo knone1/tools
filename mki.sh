@@ -1,22 +1,21 @@
-http_proxy=
 
 DIR=~/r3
 
 # R3 INFO #
 R3_DIR=~/r3
-R3_RELEASE=2012_WW15
+R3_RELEASE=2012_WW17
 R3_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 R3_MANIFEST=$R3_URL/$R3_RELEASE/manifest-$R3_RELEASE-generated.xml
 
 # R2 INFO #
 R2_DIR=~/r2
-R2_RELEASE=2012_WW14
+R2_RELEASE=2012_WW17
 R2_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r2/android/gingerbread-platform/releases
 R2_MANIFEST=$R2_URL/$R2_RELEASE/manifest-$R2_RELEASE-generated.xml
 
 # R3 INFO #
 CV_DIR=~/r3
-CV_RELEASE=2012_WW15
+CV_RELEASE=2012_WW16
 CV_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 CV_MANIFEST=$CV_URL/$CV_RELEASE/manifest-$CV_RELEASE-generated.xml
 
@@ -91,7 +90,13 @@ incremental_kernel(){
 	print "BUILDING KERNEL FOR: $1 PLATFORM: $PLATFORM"
 
 	cd $DIR
-	rm -rf $DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage  $DIR/$OUT_PLATFORM/boot/kernel
+	rm -rf $DIR/$OUT_PLATFORM/boot.bin
+	rm -rf $DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage
+	rm -rf $DIR/$OUT_PLATFORM/kernel_build/arch/i386/boot/bzImage
+	rm -rf $DIR/$OUT_PLATFORM/bzImage
+	source build/envsetup.sh
+	lunch $PLATFORM-eng
+
 	$DIR/vendor/intel/support/kernel-build.sh -c $PLATFORM -o $DIR/$OUT_PLATFORM/kernel_build
 	if [ ! -e $DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage ]; then
 		print "######  BUILD ERROR #####"
@@ -99,7 +104,7 @@ incremental_kernel(){
 	fi
 	CTP_CMDLINE="init=/init pci=noearly console=ttyS0 earlyprintk=mrst loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=ctp_pr0 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on"
 	MFLD_CMDLINE="init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug"
-	
+
 	vendor/intel/support/mkbootimg --cmdline $MFLD_CMDLINE  --ramdisk $OUT_PLATFORM/boot/ramdisk.img \
 	--kernel $OUT_PLATFORM/kernel_build/arch/i386/boot/bzImage \
 	--output $OUT_PLATFORM/boot.bin \
@@ -110,7 +115,6 @@ incremental_kernel(){
 
 build_kernel()
 {
-	reboot
 	print "BUILDING $1"
 	case $1 in
 	r2)incremental_kernel $1;;
@@ -335,6 +339,22 @@ make_package()
 }
 
 make_shit(){
+	cd  ~/RELEASES/R3/2012_WW16
+	source build/envsetup.sh
+        lunch $PLATFORM-eng
+
+	cd ~/RELEASES/R3/2012_WW17/frameworks/base/services/java/com/android/server
+	mm
+	cd ~/RELEASES/R3/2012_WW17/frameworks/base/wifi/java/android/net/wifi/
+	mm
+
+	adb remount
+	adb push ~/RELEASES/R3/2012_WW17/out/target/product/mfld_pr2/system/framework/services.jar /system/framework/services.jar
+	adb push ~/RELEASES/R3/2012_WW17/out/target/product/mfld_pr2/system/framework/framework.jar /system/framework/framework.jar
+	adb reboot	
+
+	exit 1
+
 	cd $R3_DIR
 	source build/envsetup.sh
 	lunch mfld_pr2-eng
@@ -362,6 +382,44 @@ make_shit2(){
 #	adb push out/target/product/mfld_pr2/system/lib/libandroid_servers.so /system/lib/libandroid_servers.so
 	adb push out/target/product/mfld_pr2/system/framework/services.jar /system/framework/services.jar
 	adb reboot
+
+}
+
+ramdisk(){
+	sudo echo ""
+	adb reboot recovery
+	cd $R3_DIR/$OUT_PLATFORM
+	if [ ! -e axel_ram ]; then
+		cp ramdisk.img ramdisk.img.bkp
+		mkdir axel_ram
+		cd axel_ram
+		gunzip -c ../ramdisk.img | cpio -i
+		cd ..
+	fi
+	
+	cd axel_ram
+	find . | cpio -o -H newc | gzip > ../ramdisk.img
+	
+	cd $R3_DIR
+	vendor/intel/support/mkbootimg --cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug" --ramdisk $OUT_PLATFORM/ramdisk.img \
+	--kernel $OUT_PLATFORM/kernel_build/arch/i386/boot/bzImage \
+	--output $OUT_PLATFORM/boot.bin \
+	--product $PLATFORM \
+	--type mos
+
+	cd $R3_DIR/$OUT_PLATFORM
+	sudo fastboot flash boot ./boot.bin
+	sudo fastboot continue
+}
+
+wifi(){
+	cd $R3_DIR
+	source build/envsetup.sh
+        lunch mfld_pr2-eng
+	vendor/intel/support/wl12xx-compat-build.sh -c mfld_pr2
+	cd $R3_DIR/$OUT_PLATFORM
+	cp ./root/lib/modules/* ./axel_ram/lib/modules/
+	ramdisk;
 
 }
 
@@ -400,6 +458,12 @@ while [ ! -z "$1" ]; do
 	-h)
 		usage
 		shift
+		break;;
+	-r)
+		ramdisk;
+		break;;
+	-w)	
+		wifi;
 		break;;
 	*)
 		usage

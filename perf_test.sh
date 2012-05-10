@@ -16,7 +16,7 @@ dut_udp_up()
 {
 	echo "client udp up"
 	# UDP UP 
-	adb shell "/data/iperf-static -u -c $PC_IP -b 40M -t 120 > /data/iperf_client.txt" &
+	adb shell "/data/iperf-static -u -c $PC_IP -b 55M -t 120 > /data/iperf_client.txt" &
 }
 
 dut_tcp_up()
@@ -36,7 +36,7 @@ dut_tcp_down()
 pc_udp_down()
 {
 	echo "server_udp_down"
-	iperf -u -c $DUT_IP -b 40M -t 120 > ~/iperf_server.txt &
+	iperf -u -c $DUT_IP -b 55M -t 120 > ~/iperf_server.txt &
 }
 
 pc_udp_up()
@@ -83,6 +83,16 @@ clean()
 	
 }
 
+usb_on(){
+#phy 0 off
+#sleep 3
+echo 
+}
+
+usb_off(){
+#phy 0 on
+echo
+}
 
 run(){
 FILE=~/iperf$1.txt
@@ -94,7 +104,9 @@ case $1 in
 		pc_udp_up
 		sleep 1;
 		dut_udp_up
+		usb_off;
 		sleep $TEST_TIME;
+		usb_on;
 		clean;
 		;;
 
@@ -102,22 +114,28 @@ case $1 in
 		dut_udp_down
 		sleep 1;
 		pc_udp_down
+		usb_off;
 		sleep $TEST_TIME;
+		usb_on;
 		clean;
 		;;
 	-tcp_up)
 		pc_tcp_up
 		sleep 1;
 		dut_tcp_up
+		usb_off;
 		sleep $TEST_TIME;
+		usb_on;
 		clean;
 		;;
 
 	-tcp_down)
 		dut_tcp_down
 		sleep 1;
-		pc_tcp_down
+		pc_tcp_down;
+		usb_off;
 		sleep $TEST_TIME;
+		usb_on;
 		clean;
 		;;
 
@@ -133,6 +151,7 @@ esac
 case $1 in
 	-all)
 		rm ~/iperf*
+		phy 0 off
 		run -udp_up
 		run -udp_down
 		run -tcp_up

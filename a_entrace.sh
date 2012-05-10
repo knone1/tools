@@ -6,7 +6,7 @@ adb shell "cd /sys/kernel/debug/tracing;
 	echo funcgraph-proc > trace_options;
 	echo trace_printk > trace_options;
 	echo !mid_suspend > set_ftrace_filter;
-	echo 60000 > buffer_size_kb;
+	echo 2000 > buffer_size_kb;
 	echo function_graph > ./current_tracer;
 	echo function  > ./current_tracer;
 	echo 0 > ./trace;
