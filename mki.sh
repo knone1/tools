@@ -3,9 +3,11 @@ DIR=~/r3
 
 # R3 INFO #
 R3_DIR=~/r3
-R3_RELEASE=2012_WW17
+R3_RELEASE=2012_WW22
 R3_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 R3_MANIFEST=$R3_URL/$R3_RELEASE/manifest-$R3_RELEASE-generated.xml
+
+
 
 # R2 INFO #
 R2_DIR=~/r2
@@ -18,6 +20,8 @@ CV_DIR=~/r3
 CV_RELEASE=2012_WW16
 CV_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 CV_MANIFEST=$CV_URL/$CV_RELEASE/manifest-$CV_RELEASE-generated.xml
+
+R4_DIR=~/r4/kernel
 
 
 PLATFORM=ctp_pr0
@@ -45,6 +49,8 @@ set_dir()
 		DIR=$R3_DIR
 	elif [  "$1" = "r2" ]; then
 		DIR=$R2_DIR
+	elif [  "$1" = "r4" ]; then
+		DIR=$R4_DIR
 	elif [  "$1" = "cv" ]; then
 		DIR=$R3_DIR
 	else
@@ -113,12 +119,66 @@ incremental_kernel(){
 	
 }
 
+#
+#
+#
+raw_kernel()
+{
+	set_dir $1
+	cd $DIR
+
+	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/RELEASES/R3/2012_WW19/prebuilt/linux-x86/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=~/r4/kernel/OUT"
+	echo $PWD
+	rm ./OUT/arch/x86/boot/bzImage
+
+	make $KFLAGS -f scripts/Makefile.list auto_conf=./OUT/include/config/auto.conf
+	exit 1
+	make $KFLAGS bzImage
+	
+	if [ ! -f ./OUT/arch/x86/boot/bzImage ];then
+		echo "***BUILD ERROR***"
+		exit 1;
+	fi
+
+	make $KFLAGS modules
+
+	find ./OUT -iname "*.ko" -exec cp "{}" ./BOOT \;
+	find /home/axelh/r4/wlan/wl12xx-compat -iname "*.ko" -exec cp "{}" ./BOOT \;
+	ls ./BOOT
+	cp ./OUT/arch/x86/boot/bzImage ./BOOT
+
+	if [ -f $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage.bkp ];then
+		mv $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage.bkp $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage
+		rm $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage.bkp
+	fi
+	if [ -d $R3_DIR/$OUT_PLATFORM/root/lib/modules.bkp ];then
+		rm -rf $R3_DIR/$OUT_PLATFORM/root/lib/modules
+		mv $R3_DIR/$OUT_PLATFORM/root/lib/modules.bkp $R3_DIR/$OUT_PLATFORM/root/lib/modules
+	fi
+
+	#backup r3
+	cp $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage.bkp
+	mv $R3_DIR/$OUT_PLATFORM/root/lib/modules $R3_DIR/$OUT_PLATFORM/root/lib/modules.bkp
+	mkdir $R3_DIR/$OUT_PLATFORM/root/lib/modules
+
+	cp ./BOOT/bzImage $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage
+	cp ./BOOT/*.ko $R3_DIR/$OUT_PLATFORM/root/lib/modules/
+	cp $R3_DIR/$OUT_PLATFORM/root/lib/modules/* $R3_DIR/$OUT_PLATFORM/axel_ram/lib/modules/
+	ramdisk
+	
+	rm -rf $R3_DIR/$OUT_PLATFORM/root/lib/modules
+	mv $R3_DIR/$OUT_PLATFORM/root/lib/modules.bkp $R3_DIR/$OUT_PLATFORM/root/lib/modules
+	mv $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage.bkp $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage
+	rm $R3_DIR/$OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage.bkp
+}
+
 build_kernel()
 {
 	print "BUILDING $1"
 	case $1 in
 	r2)incremental_kernel $1;;
 	r3)incremental_kernel $1;;
+	r4)raw_kernel $1;;
 	cv)incremental_kernel $1;;
 	boottarball_r3)build_boottarball $1;;
 	boottarball_r2)build_boottarball $1;;
@@ -174,7 +234,7 @@ get(){
 	
 	esac
 	
-	if [ -e $THIS_DIR ]; then
+	if [ -d $THIS_DIR ]; then
 		echo "$THIS_DIR exists."
 		exit 1;
 	fi
@@ -188,6 +248,9 @@ get(){
 	wget -r -l1 --no-parent -A"*blankphone.zip" http://$THIS_URL/$THIS_RELEASE/$PLAT_DIR/flash_files/blankphone/
 	mv $THIS_URL/$THIS_RELEASE/$PLAT_DIR/flash_files/blankphone/* .
 	rm -rf jfumgbuild-depot.jf.intel.com
+
+	wget http://$THIS_URL/$THIS_RELEASE/$PLAT_DIR/fastboot-images/eng/system.tar.gz
+	wget http://$THIS_URL/$THIS_RELEASE/$PLAT_DIR/fastboot-images/eng/boot.bin
 
 }
 
@@ -239,7 +302,7 @@ scratch()
 	r3)	NEW_BUILD_DIR=~/RELEASES/R3/$R3_RELEASE
 		RELEASE=$R3_RELEASE
 		MANIFEST=$R3_MANIFEST
-		if [ -ne ~/RELEASES/R3 ];then
+		if [ ! -d ~/RELEASES/R3 ];then
 			mkdir -p ~/RELEASES/R3
 		fi
 		;;
@@ -254,7 +317,7 @@ scratch()
 		rm -rf $NEW_BUILD_DIR
 	fi
 
-	if [ -e $NEW_BUILD_DIR ]; then
+	if [ -d $NEW_BUILD_DIR ]; then
 		print "$RELEASE BUILD EXISTS PLEASE REMOVE IT. or use -f"
 		exit
 	fi
@@ -291,6 +354,15 @@ echo "usage is:
 -b) runs make at top dir: mki.sh -f r3
 -d) Download prebuilt binaries. mki.sh -d r3
 -p) make r3 package from local build
+-r) make ramdisk
+-w) make wireless modules
+-e) edit this file
+-usb_on)
+-usb_off)
+-board_on)
+-board_off)
+-board_restart)
+
 "
 }
 make_package()
@@ -401,27 +473,62 @@ ramdisk(){
 	find . | cpio -o -H newc | gzip > ../ramdisk.img
 	
 	cd $R3_DIR
-	vendor/intel/support/mkbootimg --cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug" --ramdisk $OUT_PLATFORM/ramdisk.img \
-	--kernel $OUT_PLATFORM/kernel_build/arch/i386/boot/bzImage \
+	source build/envsetup.sh
+        lunch mfld_pr2-eng
+
+	vendor/intel/support/mkbootimg --cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug" --ramdisk $OUT_PLATFORM/ramdisk.img \
+	--kernel $OUT_PLATFORM/kernel_build/arch/x86/boot/bzImage \
 	--output $OUT_PLATFORM/boot.bin \
 	--product $PLATFORM \
 	--type mos
 
+	sleep 8
 	cd $R3_DIR/$OUT_PLATFORM
 	sudo fastboot flash boot ./boot.bin
 	sudo fastboot continue
 }
 
 wifi(){
+	sudo echo ""
 	cd $R3_DIR
 	source build/envsetup.sh
         lunch mfld_pr2-eng
 	vendor/intel/support/wl12xx-compat-build.sh -c mfld_pr2
 	cd $R3_DIR/$OUT_PLATFORM
-	cp ./root/lib/modules/* ./axel_ram/lib/modules/
+	cp  ./root/lib/modules/* ./axel_ram/lib/modules/
+#	find ./kernel_modules -iname "*.ko" -exec cp "{}" ./axel_ram/lib/modules/ \;
+#	cp ./kernel_modules/lib/modules/* ./axel_ram/lib/modules/
 	ramdisk;
 
 }
+
+board_on()
+{
+	phy 5 on
+}
+
+board_off()
+{
+	phy 5 off
+}
+
+board_restart()
+{
+	board_off
+	sleep 2
+	board_on
+}
+
+usb_on()
+{
+	phy 4 on
+}
+
+usb_off()
+{
+	phy 4 off
+}
+
 
 if [ -z "$1" ]; then
 	usage
@@ -464,6 +571,24 @@ while [ ! -z "$1" ]; do
 		break;;
 	-w)	
 		wifi;
+		break;;
+	-e)
+		vim ~/tools/mki.sh
+		break;;
+	-usb_on)
+		usb_on
+		break;;
+	-usb_off)
+		usb_off
+		break;;
+	-board_on)
+		board_on
+		break;;
+	-board_off)
+		board_off
+		break;;
+	-board_restart)
+		board_restart
 		break;;
 	*)
 		usage
