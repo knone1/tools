@@ -3,7 +3,7 @@ DIR=~/r3
 
 # R3 INFO #
 R3_DIR=~/r3
-R3_RELEASE=2012_WW22
+R3_RELEASE=MAIN
 R3_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 R3_MANIFEST=$R3_URL/$R3_RELEASE/manifest-$R3_RELEASE-generated.xml
 
@@ -32,7 +32,7 @@ OUT_PLATFORM=$OUT/$PLATFORM
 rm -rf $R2_DIR
 rm -rf $R3_DIR
 
-ln -s ~/RELEASES/R3/$R3_RELEASE ~/r3
+ln -s ~/$R3_RELEASE ~/r3
 ln -s ~/RELEASES/R2/$R2_RELEASE ~/r2
 
 
@@ -94,6 +94,9 @@ build_boottarball(){
 incremental_kernel(){
 	set_dir $1
 	print "BUILDING KERNEL FOR: $1 PLATFORM: $PLATFORM"
+	if [ ! -e $DIR/$OUT_PLATFORM/kernel_build2 ]; then
+		mkdir $DIR/$OUT_PLATFORM/kernel_build2
+	fi
 
 	cd $DIR
 	rm -rf $DIR/$OUT_PLATFORM/boot.bin
@@ -111,7 +114,7 @@ incremental_kernel(){
 	CTP_CMDLINE="init=/init pci=noearly console=ttyS0 earlyprintk=mrst loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=ctp_pr0 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on"
 	MFLD_CMDLINE="init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug"
 
-	vendor/intel/support/mkbootimg --cmdline $MFLD_CMDLINE  --ramdisk $OUT_PLATFORM/boot/ramdisk.img \
+	vendor/intel/support/mkbootimg --cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug"  --ramdisk $OUT_PLATFORM/ramdisk.img \
 	--kernel $OUT_PLATFORM/kernel_build/arch/i386/boot/bzImage \
 	--output $OUT_PLATFORM/boot.bin \
 	--product $PLATFORM \
@@ -125,9 +128,9 @@ incremental_kernel(){
 raw_kernel()
 {
 	set_dir $1
-	cd $DIR
+	cd $DIR/
 
-	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/RELEASES/R3/2012_WW19/prebuilt/linux-x86/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=~/r4/kernel/OUT"
+	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/RELEASES/R3/2012_WW22/prebuilt/linux-x86/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=~/r4/kernel/OUT"
 	echo $PWD
 	rm ./OUT/arch/x86/boot/bzImage
 
@@ -189,7 +192,8 @@ build_kernel()
 
 reboot(){
 	print "REBOOT"
-	adb shell "update_osip --backup --invalidate 0; update_osip --backup --invalidate 1;reboot"
+	adb reboot recovery
+#	adb shell "update_osip --backup --invalidate 0; update_osip --backup --invalidate 1;reboot"
 #	adb reboot-bootloader
 }
 
@@ -345,7 +349,8 @@ scratch()
 }
 
 
-usage(){
+usage()
+{
 echo "usage is:
 
 -k) build_kernel: (mki.sh -k boottarball_r3 || mki.sh -k r3)
@@ -365,6 +370,7 @@ echo "usage is:
 
 "
 }
+
 make_package()
 {
 	set_dir $1
@@ -415,7 +421,7 @@ make_shit(){
 	source build/envsetup.sh
         lunch $PLATFORM-eng
 
-	cd ~/RELEASES/R3/2012_WW17/frameworks/base/services/java/com/android/server
+	cd ~/RELEASES//frameworks/base/services/java/com/android/server
 	mm
 	cd ~/RELEASES/R3/2012_WW17/frameworks/base/wifi/java/android/net/wifi/
 	mm
@@ -498,7 +504,7 @@ wifi(){
 	cp  ./root/lib/modules/* ./axel_ram/lib/modules/
 #	find ./kernel_modules -iname "*.ko" -exec cp "{}" ./axel_ram/lib/modules/ \;
 #	cp ./kernel_modules/lib/modules/* ./axel_ram/lib/modules/
-	ramdisk;
+	#ramdisk;
 
 }
 

@@ -5,10 +5,9 @@ adb shell "cd /sys/kernel/debug/tracing;
 	echo funcgraph-abstime > trace_options;
 	echo funcgraph-proc > trace_options;
 	echo trace_printk > trace_options;
-	echo !mid_suspend > set_ftrace_filter;
-	echo 2000 > buffer_size_kb;
-	echo function_graph > ./current_tracer;
-	echo function  > ./current_tracer;
+	echo function > current_tracer;
+	echo 0 > options/func_stack_trace
+	echo 20000 > buffer_size_kb;
 	echo 0 > ./trace;
 	echo 0 > /sys/kernel/debug/tracing/per_cpu/cpu0/trace;
 	echo 1 > ./tracing_enabled;
@@ -16,5 +15,11 @@ adb shell "cd /sys/kernel/debug/tracing;
 	cat /sys/kernel/debug/tracing/tracing_on;
 	cat /sys/kernel/debug/tracing/buffer_size_kb;
 	cat /sys/kernel/debug/tracing/trace_options;
+	echo """"
+	echo FILTERS
+	echo wl1271_tx* > set_ftrace_filter;
+	echo wl1271_rx* >> set_ftrace_filter;
+	cat  /sys/kernel/debug/tracing/set_ftrace_filter;
+	echo 1 > tracing_on;
 	echo done;"
 
