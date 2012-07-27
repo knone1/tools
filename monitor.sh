@@ -9,10 +9,11 @@ sudo iwconfig wlan0 channel $1
 
 echo "wlan up "
 sudo ifconfig wlan0 up
+sudo wireshark
 }
 
 unset(){
-
+killall -9 wireshark
 echo "wlan down..."
 sudo ifconfig wlan0 down
 echo "managed mode..."

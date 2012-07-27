@@ -1,4 +1,4 @@
-NEW=/home/axelh/RELEASES/R3/2012_WW22
+NEW=/home/axelh/MAIN
 CUR_DIR=$PWD
 is_diff=0;
 
@@ -169,7 +169,7 @@ find_changed_by_intel()
 					echo $f >> $CUR_DIR/is_conflict.txt	
 				fi
 				
-				if [ -n $is_cws ]; then
+				if [ -n "$is_cws" ]; then
 					echo $f >> $CUR_DIR/is_cws.txt
 				fi
 				echo $f >> $CUR_DIR/is_intel.txt
@@ -194,9 +194,11 @@ find_changed_by_intel()
 
 
 
-#find_files
-#separate_dir_form_file
-#find_changed_by_intel
+find_files
+separate_dir_form_file
+find_changed_by_intel
+
+exit 1;
 get_author()
 {
 	remove_if_present $CUR_DIR/is_authors.txt

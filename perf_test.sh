@@ -1,6 +1,8 @@
 TEST_TIME=25
-DUT_IP=192.168.1.8
-PC_IP=192.168.1.2
+DUT_IP=192.168.1.104
+PC_IP=192.168.1.24
+DIR=$PWD
+adb push ~/tools/iperf-static /data
 
 
 # CLIENT
@@ -36,25 +38,25 @@ dut_tcp_down()
 pc_udp_down()
 {
 	echo "server_udp_down"
-	iperf -u -c $DUT_IP -b 55M -t 120 > ~/iperf_server.txt &
+	iperf -u -c $DUT_IP -b 55M -t 120 > $DIR/iperf_server.txt &
 }
 
 pc_udp_up()
 {
 	echo "server udp up"
-	iperf -s -i 5 -u > ~/iperf_server.txt &
+	iperf -s -i 5 -u > $DIR/iperf_server.txt &
 }
 
 pc_tcp_down()
 {
 	echo "server_tcp_down"
-	iperf -c $DUT_IP -t 120 -i 5 -w 64k > ~/iperf_server.txt &
+	iperf -c $DUT_IP -t 120 -i 5 -w 64k > $DIR/iperf_server.txt &
 }
 
 pc_tcp_up()
 {
 	echo "server_tcp_up"
-	iperf -s -i 5 > ~/iperf_server.txt &
+	iperf -s -i 5 > $DIR/iperf_server.txt &
 }
 usage()
 {
@@ -73,13 +75,13 @@ clean()
 	killall -9 iperf
 	sudo adb kill-server
 	sudo adb start-server	
-	adb pull /data/iperf_client.txt ~/
+	adb pull /data/iperf_client.txt $DIR
 	echo "**************** iperf_client">> $FILE
-	cat ~/iperf_client.txt >> $FILE
+	cat $DIR/iperf_client.txt >> $FILE
 	echo  echo "**************** iperf_server" >> $FILE
-	cat ~/iperf_server.txt >> $FILE
-	rm ~/iperf_client.txt
-	rm ~/iperf_server.txt
+	cat $DIR/iperf_server.txt >> $FILE
+	rm $DIR/iperf_client.txt
+	rm $DIR/iperf_server.txt
 	
 }
 
@@ -95,7 +97,7 @@ echo
 }
 
 run(){
-FILE=~/iperf$1.txt
+FILE=$DIR/iperf$1.txt
 echo "####################################" > $FILE
 echo $1>> $FILE
 echo "####################################">> $FILE
@@ -146,17 +148,19 @@ case $1 in
 		;;
 
 esac
+
+cat $DIR/iperf$1.txt
+
 }
 
 case $1 in
 	-all)
-		rm ~/iperf*
-		phy 0 off
+		rm $DIR/iperf*
 		run -udp_up
 		run -udp_down
 		run -tcp_up
 		run -tcp_down
-		cat ~/iperf* > ~/result.txt
+		cat $DIR/iperf* > $DIR/result.txt
 		;;
 	*)
 		run $1

@@ -7,6 +7,8 @@ R3_RELEASE=MAIN
 R3_URL=jfumgbuild-depot.jf.intel.com/build/eng-builds/mfld-r3/android/ice-cream-sandwich-platform/releases
 R3_MANIFEST=$R3_URL/$R3_RELEASE/manifest-$R3_RELEASE-generated.xml
 
+R3_MANIFEST=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/main/PSI/daily/latest/manifest-20120711_517-generated.xml
+
 
 
 # R2 INFO #
@@ -88,14 +90,14 @@ build_boottarball(){
 	rm -rf $DIR/$OUT_PLATFORM/bzImage
 	source build/envsetup.sh
 	lunch $PLATFORM-eng
-	make -j4 boottarball	
+	make -j4 bootimage	
 }
 
 incremental_kernel(){
 	set_dir $1
 	print "BUILDING KERNEL FOR: $1 PLATFORM: $PLATFORM"
 	if [ ! -e $DIR/$OUT_PLATFORM/kernel_build2 ]; then
-		mkdir $DIR/$OUT_PLATFORM/kernel_build2
+		mv $DIR/$OUT_PLATFORM/kernel_build $DIR/$OUT_PLATFORM/kernel_build2	
 	fi
 
 	cd $DIR
@@ -114,7 +116,7 @@ incremental_kernel(){
 	CTP_CMDLINE="init=/init pci=noearly console=ttyS0 earlyprintk=mrst loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=ctp_pr0 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on"
 	MFLD_CMDLINE="init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug"
 
-	vendor/intel/support/mkbootimg --cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on apic=debug"  --ramdisk $OUT_PLATFORM/ramdisk.img \
+	vendor/intel/support/mkbootimg --cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 intel_scu_watchdog.disable_kernel_watchdog=1"  --ramdisk $OUT_PLATFORM/ramdisk.img \
 	--kernel $OUT_PLATFORM/kernel_build/arch/i386/boot/bzImage \
 	--output $OUT_PLATFORM/boot.bin \
 	--product $PLATFORM \
@@ -127,22 +129,22 @@ incremental_kernel(){
 #
 raw_kernel()
 {
-	set_dir $1
-	cd $DIR/
+	SANDBOX_KERNEL=~/LOCAL/SANDBOX_KERNEL
+	cd $SANDBOX_KERNEL
 
-	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/RELEASES/R3/2012_WW22/prebuilt/linux-x86/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=~/r4/kernel/OUT"
-	echo $PWD
-	rm ./OUT/arch/x86/boot/bzImage
+	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/LOCAL/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8"
+	rm ./arch/x86/boot/bzImage
 
-	make $KFLAGS -f scripts/Makefile.list auto_conf=./OUT/include/config/auto.conf
-	exit 1
+#	make $KFLAGS -f scripts/Makefile.list auto_conf=./OUT/include/config/auto.conf
+#	exit 1
 	make $KFLAGS bzImage
 	
-	if [ ! -f ./OUT/arch/x86/boot/bzImage ];then
+	if [ ! -f ./arch/x86/boot/bzImage ];then
 		echo "***BUILD ERROR***"
 		exit 1;
 	fi
-
+	
+	exit 1;
 	make $KFLAGS modules
 
 	find ./OUT -iname "*.ko" -exec cp "{}" ./BOOT \;
@@ -192,13 +194,14 @@ build_kernel()
 
 reboot(){
 	print "REBOOT"
-	adb reboot recovery
+	adb reboot bootloader
 #	adb shell "update_osip --backup --invalidate 0; update_osip --backup --invalidate 1;reboot"
 #	adb reboot-bootloader
 }
 
 flash_kernel()
 {
+	sudo echo ""
 	reboot
 	set_dir $1
 	cd $DIR
@@ -465,7 +468,6 @@ make_shit2(){
 
 ramdisk(){
 	sudo echo ""
-	adb reboot recovery
 	cd $R3_DIR/$OUT_PLATFORM
 	if [ ! -e axel_ram ]; then
 		cp ramdisk.img ramdisk.img.bkp
@@ -487,11 +489,6 @@ ramdisk(){
 	--output $OUT_PLATFORM/boot.bin \
 	--product $PLATFORM \
 	--type mos
-
-	sleep 8
-	cd $R3_DIR/$OUT_PLATFORM
-	sudo fastboot flash boot ./boot.bin
-	sudo fastboot continue
 }
 
 wifi(){

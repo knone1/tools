@@ -16,10 +16,6 @@ adb shell "cd /sys/kernel/debug/tracing;
 	cat /sys/kernel/debug/tracing/buffer_size_kb;
 	cat /sys/kernel/debug/tracing/trace_options;
 	echo """"
-	echo FILTERS
-	echo wl1271_tx* > set_ftrace_filter;
-	echo wl1271_rx* >> set_ftrace_filter;
-	cat  /sys/kernel/debug/tracing/set_ftrace_filter;
-	echo 1 > tracing_on;
+	echo 0 > tracing_on;
 	echo done;"
 
