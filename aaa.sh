@@ -112,6 +112,14 @@ new_project()
 	
 }
 
+
+
+
+
+
+###############################################################################
+# MAKERS
+###############################################################################
 make_kernel()
 {
 	cd $PROJECT_DIR/hardware/intel/linux-2.6
@@ -215,6 +223,13 @@ make_broadcom()
 }
 
 
+
+
+
+###############################################################################
+# FLASHERS
+###############################################################################
+
 flash_my_boot()
 {
 	exit_if_no_file $MY_BOOT_DIR/boot.bin
@@ -254,6 +269,11 @@ flash_my_build()
 	fastboot continue
 }
 
+
+
+###############################################################################
+# POWER
+###############################################################################
 power_on(){
 phy 5 on
 }
@@ -269,6 +289,24 @@ phy 4 on
 usb_off(){
 phy 4 off
 }
+
+
+###############################################################################
+# RUNNERS
+###############################################################################
+run_syncer()
+{
+	while [ ! -z "$1" ]; do
+		cd $CUR_DIR
+		repo sync
+		lunch $PLATFORM-eng
+	        make -j8 $PLATFORM
+		sleep 3600
+	done
+		
+}
+
+
 
 
 usage()
@@ -314,15 +352,20 @@ while [ ! -z "$1" ]; do
 	mb)	make_bootimage;break;;
 	mq)	make_broadcom;break;;
 	mr)	make_ramdisk;break;;
+
 	fb)	flash_my_boot;break;;
 	ff)	flash_my_build;break;;
 	ft)	flash_this;break;;
+
 	po)	power_on;break;;
 	pf)	power_off;break;;
 	pr)	power_restart;break;;
 	uo)	usb_on;break;;
 	uf)	usb_off;break;;
 	cd)	goto_project;break;;
+	
+	rs)	run_syncer;break;;
+
 	c)	check;break;;
 	e)	vim ~/tools/aaa.sh;break;;
 	*)	usage;break;;
