@@ -1,12 +1,46 @@
-TEST_TIME=25
+
+####################
+#    SETTINGS
+####################
 DUT_IP=192.168.1.100
 PC_IP=192.168.1.24
+ANDROID_IPERF=~/tools/iperf-static
+
+
+####################
+#   VARIABLES
+####################
 DIR=$PWD
 TEST="NONE"
+W=64k
+TEST_TIME=25
 
-W=128k
-ANDROID_IPERF=~/tools
 
+usage()
+{
+echo "usage:
+perf2.sh -udp_up
+perf2.sh -udp_down
+perf2.sh -tpp_up
+perf2.sh -tcp_down
+perf2.sh -all
+
+inside the script file you have to set the 
+DUT_IP PC_IP ANDROID_IPERF
+to the right values, where:
+
+DUT_IP: ip address of the device
+PC_IP: ip address of the pc
+ANDROID_IPERF: path of the static compiled iperf binary
+
+results will be stored on the running dir
+in the file iperf_results.txt. the output
+of the server and client for each test will be
+on the file iperf-*. for example:
+	iperf-udp_down.txt
+"
+
+}
 
 print()
 {
@@ -14,8 +48,6 @@ print()
         echo $1
         echo "#######################################################"
 }
-
-
 
 dut_udp_down()
 {
@@ -64,17 +96,6 @@ pc_tcp_up()
 	echo "pc_tcp_up iperf -s"
 	iperf -s > $DIR/iperf_server.txt &
 }
-usage()
-{
-echo "usage:
--udp_up
--udp_down
--tpp_up
--tcp_down
--all
-"
-
-}
 
 clean()
 {
@@ -102,8 +123,8 @@ clean()
 run()
 {
 
-FILE=$DIR/iperf$1.txt
-case $1 in
+	FILE=$DIR/iperf$1.txt
+	case $1 in
 	-udp_up)
 		TEST="UDP_UP"
 		print $TEST
@@ -149,15 +170,22 @@ case $1 in
 	*)	usage
 		;;
 
-esac
-
-
+	esac
 }
 
 setup()
 {
 	sudo echo ""
 	print "SETUP"
+
+
+	echo "check if android iperf exists..."
+	if [ -e $ANDROID_IPERF ]; then
+		echo "android iperf...OK"
+	else
+		echo "android iperf...FAIL"
+		exit
+	fi 
 
 	echo "check pc ip..."
 	ifconfig eth0 > $DIR/ifconfig.txt
@@ -201,7 +229,7 @@ setup()
 	fi
 
 	echo "push iperf..."
-	adb push $ANDROID_IPERF/iperf-static /data 2>/dev/null
+	adb push $ANDROID_IPERF /data 2>/dev/null
 
 	echo cleaning 
 	rm  $DIR/iperf_* 2>/dev/null
@@ -212,6 +240,14 @@ setup()
 }
 
 
+###############################################################################
+
+
+if [ -z "$1" ]; then
+        usage
+        exit
+fi
+
 setup;
 case $1 in
 	-all)
@@ -219,6 +255,8 @@ case $1 in
 		run -udp_down
 		run -tcp_up
 		run -tcp_down
+		print "TEST DONE"
+		cat $DIR/iperf_result.txt
 		;;
 	*)
 		run $1

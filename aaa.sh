@@ -1,9 +1,14 @@
 # force to be root
 sudo echo ""
 
-MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/main/PSI/weekly/2012_WW28/manifest-MAIN-2012_WW28-generated.xml
-MANIFEST_FILE=manifest-MAIN-2012_WW28-generated.xml
-PROJECT_DIR=~/LOCAL/STABLE
+#MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/r3/PSI/weekly/2012_WW31/manifest-R3-2012_WW31-generated.xml
+#MANIFEST_FILE=manifest-R3-2012_WW31-generated.xml
+
+
+MANIFEST_URL=http://umgsw-build4.jf.intel.com/absp_builds/r3-weekly_358_60832-2_60251-6_6129..._Martin-Antoine/manifest-generated.xml
+MANIFEST_FILE=manifest-generated.xml
+
+PROJECT_DIR=/home/axelh/LOCAL/JB
 FASTBOOT_DIR=axel_fastboot
 FASTBOOT_REF=$HOME/.flasher/.download/r3/weekly/2012_WW28/MFLD_PRx/flash_files/build-eng/mfld_prx-eng-fastboot-r3-weekly-331
 FASTBOOT_REF=~/.flasher/.download/r3/weekly/2012_WW22/mfld_prx-eng-fastboot-main-weekly-191
@@ -12,6 +17,7 @@ MY_KERNEL=$PROJECT_DIR/$OUT/axel_kernel
 MY_BOOT_DIR=$PROJECT_DIR/$OUT/axel_boot
 MY_RAMDISK=$PROJECT_DIR/$OUT/axel_ramdisk
 PLATFORM=mfld_pr2
+BUILD_TYPE=userdebug
 BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-panda-icsmr1-cfg80211-oob-3.0.8/bcmdhd.ko
 CUR_DIR=$PWD
 
@@ -70,8 +76,8 @@ init()
 	rm $PROJECT_DIR/outp
 
 	ln -s $PROJECT_DIR $HOME/project
-	ln -s $PROJECT_DIR/hardware/intel/linux-2.6 kernel
-	ln -s $PROJECT_DIR/$OUT outp
+	ln -s $PROJECT_DIR/hardware/intel/linux-2.6 $PROJECT_DIR/kernel
+	ln -s $PROJECT_DIR/$OUT $PROJECT_DIR/outp
 }
 
 ###############################################################################
@@ -105,7 +111,7 @@ new_project()
 
 	print "BUILDING SYSTEM"
 	source build/envsetup.sh
-	lunch $PLATFORM-eng
+	lunch $PLATFORM-$BUILD_TYPE
 	make -j8 $PLATFORM
 	make_kernel;
 	make_ramdisk;
@@ -122,14 +128,22 @@ new_project()
 ###############################################################################
 make_kernel()
 {
-	cd $PROJECT_DIR/hardware/intel/linux-2.6
+	cd $PROJECT_DIR 
 	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/LOCAL/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=$MY_KERNEL"
 
 	if [ ! -e $MY_KERNEL ]; then
 		mkdir $MY_KERNEL
+		echo "ddd"
+		echo $PROJECT_DIR
+		echo $OUT
 		cp $PROJECT_DIR/$OUT/kernel_build/.config $MY_KERNEL
 	fi		
 	
+	cd $PROJECT_DIR
+	source build/envsetup.sh
+	lunch $PLATFORM-$BUILD_TYPE
+	cd $PROJECT_DIR/hardware/intel/linux-2.6
+
 	print "BUILD KERNEL"
 	rm $MY_KERNEL/arch/x86/boot/bzImage
 	make $KFLAGS bzImage	
@@ -143,9 +157,19 @@ make_kernel()
 	fi
 	cp $MY_KERNEL/arch/x86/boot/bzImage $MY_BOOT_DIR
 
-	make $KFLAGS modules
-	find  $MY_KERNEL -iname "*.ko" -exec cp "{}" $MY_RAMDISK/lib/modules \;
+#	make $KFLAGS modules
+#	rm -rf $MY_RAMDISK/lib/modules/*
+#	find  $PROJECT_DIR/$OUT/kernel_modules -iname "*.ko" -exec cp "{}" $MY_RAMDISK/lib/modules \;
 
+	make_ramdisk;
+	make_bootimage;
+}
+
+make_wireless()
+{
+	cd $PROJECT_DIR
+	vendor/intel/support/wl12xx-compat-build.sh -c mfld_pr2
+	cp  $PROJECT_DIR/$OUT/root/lib/modules/* $MY_RAMDISK/lib/modules/
 	make_ramdisk;
 	make_bootimage;
 }
@@ -163,7 +187,8 @@ make_ramdisk()
 		gunzip -c ../ramdisk.img | cpio -i
 	fi
 
-	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
+	#cp $BRCM_MODULE $MY_RAMDISK/lib/modules
+	cp $PROJECT_DIR/$OUT/target/product/mfld_pr2/root/init $MY_RAMDISK/init
 
 	cd $MY_RAMDISK
 	find . | cpio -o -H newc | gzip > $MY_BOOT_DIR/my_ramdisk.img
@@ -182,7 +207,7 @@ make_bootimage()
 	source build/envsetup.sh
 
 	vendor/intel/support/mkbootimg \
---cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on" \
+--cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on" \
 --ramdisk $MY_BOOT_DIR/my_ramdisk.img \
 --kernel $MY_BOOT_DIR/bzImage \
 --output $OUT/axel_boot/boot.bin \
@@ -233,8 +258,8 @@ make_broadcom()
 flash_my_boot()
 {
 	exit_if_no_file $MY_BOOT_DIR/boot.bin
-#	adb reboot bootloader
-	adb reboot recovery
+	adb reboot bootloader
+#	adb reboot recovery
 	fastboot flash boot $MY_BOOT_DIR/boot.bin
 	fastboot continue
 }
@@ -243,12 +268,17 @@ flash_this()
 {
 
 	cd $CUR_DIR
-	adb reboot recovery
+#	adb reboot recovery
+	adb reboot bootloader
 	fastboot erase data;
 	fastboot erase system;
 	fastboot erase boot;
 	fastboot flash boot boot.bin ;
-	fastboot flash system system.tar.gz ;
+	if [ -e system.tar.gz ]; then
+		fastboot flash system system.tar.gz ;
+	else
+		fastboot flash system system.img.gz 
+	fi
 	fastboot continue
 
 
@@ -260,7 +290,8 @@ flash_my_build()
 	exit_if_no_file $MY_BOOT_DIR/boot.bin
 	exit_if_no_file $PROJECT_DIR/$OUT/system.tar.gz
 
-	adb reboot recovery
+#	adb reboot recovery
+	adb reboot bootloader
 	fastboot erase system
 	fastboot erase data
 	fastboot erase boot
@@ -296,12 +327,17 @@ phy 4 off
 ###############################################################################
 run_syncer()
 {
-	while [ ! -z "$1" ]; do
+	
+
+	while true; do
 		cd $CUR_DIR
 		repo sync
 		lunch $PLATFORM-eng
 	        make -j8 $PLATFORM
-		sleep 3600
+		NOW=$(date +%s)
+		TARGET=$(date -d '01/01/2012 12:00' +%s)
+		SEC=$(( $TARGET - $NOW ))
+		sleep $SEC
 	done
 		
 }
@@ -352,6 +388,7 @@ while [ ! -z "$1" ]; do
 	mb)	make_bootimage;break;;
 	mq)	make_broadcom;break;;
 	mr)	make_ramdisk;break;;
+	mw)	make_wireless;break;;
 
 	fb)	flash_my_boot;break;;
 	ff)	flash_my_build;break;;
