@@ -3,12 +3,16 @@ sudo echo ""
 
 #MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/r3/PSI/weekly/2012_WW31/manifest-R3-2012_WW31-generated.xml
 #MANIFEST_FILE=manifest-R3-2012_WW31-generated.xml
+#MANIFEST_URL=http://umgsw-build4.jf.intel.com/absp_builds/r3-weekly_358_60832-2_60251-6_6129..._Martin-Antoine/manifest-generated.xml
+#MANIFEST_FILE=manifest-generated.xml
+MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/main/PSI/weekly/2012_WW33/manifest-main-2012_WW33-generated.xml
+MANIFEST_FILE=manifest-main-2012_WW33-generated.xml
+
+#PROJECT_DIR=/home/axelh/GITS/MAIN
+PROJECT_DIR=/home/axelh/GITS/R3STABLE
+#PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
 
 
-MANIFEST_URL=http://umgsw-build4.jf.intel.com/absp_builds/r3-weekly_358_60832-2_60251-6_6129..._Martin-Antoine/manifest-generated.xml
-MANIFEST_FILE=manifest-generated.xml
-
-PROJECT_DIR=/home/axelh/LOCAL/JB
 FASTBOOT_DIR=axel_fastboot
 FASTBOOT_REF=$HOME/.flasher/.download/r3/weekly/2012_WW28/MFLD_PRx/flash_files/build-eng/mfld_prx-eng-fastboot-r3-weekly-331
 FASTBOOT_REF=~/.flasher/.download/r3/weekly/2012_WW22/mfld_prx-eng-fastboot-main-weekly-191
@@ -18,7 +22,7 @@ MY_BOOT_DIR=$PROJECT_DIR/$OUT/axel_boot
 MY_RAMDISK=$PROJECT_DIR/$OUT/axel_ramdisk
 PLATFORM=mfld_pr2
 BUILD_TYPE=userdebug
-BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-panda-icsmr1-cfg80211-oob-3.0.8/bcmdhd.ko
+BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-panda-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
 CUR_DIR=$PWD
 
 ARG1=$1
@@ -83,7 +87,7 @@ init()
 ###############################################################################
 # INIT FROM MAINIFEST
 ###############################################################################
-new_project()
+sync_new_project()
 {
 	exit_if_file $PROJECT_DIR 
 
@@ -118,6 +122,30 @@ new_project()
 	
 }
 
+sync_existing_project()
+{
+	exit_if_no_file $PROJECT_DIR 
+
+	cd $PROJECT_DIR
+
+	print "REPO SYNC"
+	repo sync
+
+	#Check that sync worked and try again if not.
+	if [ ! -e $PROJECT_DIR/frameworks ]; then
+		print "REPO SYNC FAILED, TRYING AGAIN"
+		rm -rf $PROJECT_DIR
+		new_project;
+	fi
+
+	print "BUILDING SYSTEM"
+	source build/envsetup.sh
+	lunch $PLATFORM-$BUILD_TYPE
+	make -j8 $PLATFORM
+	make_kernel;
+	make_ramdisk;
+	
+}
 
 
 
@@ -157,21 +185,25 @@ make_kernel()
 	fi
 	cp $MY_KERNEL/arch/x86/boot/bzImage $MY_BOOT_DIR
 
-#	make $KFLAGS modules
+	make $KFLAGS modules
 #	rm -rf $MY_RAMDISK/lib/modules/*
-#	find  $PROJECT_DIR/$OUT/kernel_modules -iname "*.ko" -exec cp "{}" $MY_RAMDISK/lib/modules \;
 
-	make_ramdisk;
-	make_bootimage;
+	echo copy
+	find  $MY_KERNEL -iname "*.ko" -exec cp -rf "{}" $MY_RAMDISK/lib/modules \;
+
+
+	cd $MY_RAMDISK/lib/modules
+	find . -type f -name '*.ko' | xargs -n 1 ~/GITS/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux-objcopy --strip-unneeded
+
 }
 
 make_wireless()
 {
 	cd $PROJECT_DIR
 	vendor/intel/support/wl12xx-compat-build.sh -c mfld_pr2
-	cp  $PROJECT_DIR/$OUT/root/lib/modules/* $MY_RAMDISK/lib/modules/
+	
+	find $PROJECT_DIR/$OUT/compat_modules/lib/modules -iname "*.ko" -exec cp -rf "{}" $MY_RAMDISK/lib/modules \;
 	make_ramdisk;
-	make_bootimage;
 }
 
 make_ramdisk()
@@ -187,7 +219,7 @@ make_ramdisk()
 		gunzip -c ../ramdisk.img | cpio -i
 	fi
 
-	#cp $BRCM_MODULE $MY_RAMDISK/lib/modules
+	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
 	cp $PROJECT_DIR/$OUT/target/product/mfld_pr2/root/init $MY_RAMDISK/init
 
 	cd $MY_RAMDISK
@@ -207,7 +239,7 @@ make_bootimage()
 	source build/envsetup.sh
 
 	vendor/intel/support/mkbootimg \
---cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on" \
+--cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on idle=poll" \
 --ramdisk $MY_BOOT_DIR/my_ramdisk.img \
 --kernel $MY_BOOT_DIR/bzImage \
 --output $OUT/axel_boot/boot.bin \
@@ -237,7 +269,7 @@ make_broadcom()
 	rm $BRCM_MODULE
 	rm $MY_RAMDISK/lib/modules/bcmdhd.ko
 
-	vendor/intel/support/bcm43xx-build.sh
+	vendor/intel/support/bcmdhd-build.sh mfld_pr2
 	exit_if_no_file $BRCM_MODULE
 
 	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
@@ -349,24 +381,32 @@ usage()
 {
 echo "
 USAGE IS:
-	mn)	new_project;break;;
+	sn)	sync_new_project;break;;
+	se)	sync_existing_project;break;;
+
 	mk)	make_kernel;break;;
 	mf)	make_fastboot_dir;break;;
 	mb)	make_bootimage;break;;
 	mq)	make_broadcom;break;;
 	mr)	make_ramdisk;break;;
+	mw)	make_wireless;break;;
+
 	fb)	flash_my_boot;break;;
 	ff)	flash_my_build;break;;
+	ft)	flash_this;break;;
+
 	po)	power_on;break;;
 	pf)	power_off;break;;
 	pr)	power_restart;break;;
 	uo)	usb_on;break;;
 	uf)	usb_off;break;;
 	cd)	goto_project;break;;
+	
+	rs)	run_syncer;break;;
+
 	c)	check;break;;
 	e)	vim ~/tools/aaa.sh;break;;
 	*)	usage;break;;
-
 "
 }
 ###############################################################################
@@ -382,7 +422,9 @@ init;
 
 while [ ! -z "$1" ]; do
 	case $1 in
-	mn)	new_project;break;;
+	sn)	sync_new_project;break;;
+	se)	sync_existing_project;break;;
+
 	mk)	make_kernel;break;;
 	mf)	make_fastboot_dir;break;;
 	mb)	make_bootimage;break;;
