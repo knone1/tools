@@ -2,8 +2,9 @@
 ####################
 #    SETTINGS
 ####################
-DUT_IP=192.168.1.102
+DUT_IP=192.168.1.100
 PC_IP=192.168.1.24
+FOLDER=$1
 ANDROID_IPERF=~/tools/iperf-static
 
 
@@ -15,9 +16,11 @@ TEST="NONE"
 W=64k
 
 TIME=30
-MARGIN=10
+MARGIN=5
 M=$2
 MON_TIME=10
+ARG1=$1
+ARG2=$2
 
 
 usage()
@@ -68,8 +71,8 @@ pc_udp_down()
 
 dut_udp_up()
 {
-	echo "dut_udp_up /data/iperf-static -u -c $PC_IP -b $M"M" -t 10"
-	adb shell "/data/iperf-static -u -c $PC_IP -b $M"M" -t $PT > /data/iperf_client.txt" &
+	echo "dut_udp_up /data/iperf-static -u -c $PC_IP -b $M"M" -t $TIME"
+	adb shell "/data/iperf-static -u -c $PC_IP -b $M"M" -t $TIME > /data/iperf_client.txt" &
 }
 
 dut_tcp_up()
@@ -124,33 +127,46 @@ clean()
 
 	echo  "$TEST $RESULT"
 	echo  "$TEST $RESULT" >>$DIR/iperf_result.txt
+	echo "ACTUAL_MBPS $RESULT" >> ./cpuload-$M.txt
 }
 
 monitor_top()
 {
 
-	TASK=irq/258
-#	TASK=dhd_dpc
+#	TASK=irq/258
+#	IRQ1=wl1271
+#	IRQ2=mmc2
+
+	TASK="dhd_dpc"
+	IRQ1=bcmsdh_sdmmc
+	IRQ2=mmc2
+
+#	sh echo "top -d 0|egrep \042$TASK\042" > ./t.sh
+
+	adb push ./t.sh /data
 	sleep $MARGIN
 	echo "monitoring top start"
-	adb shell "top -d 0|egrep $TASK" > ./cpuload-$M.txt &
+#	adb shell "top -d 0|egrep $TASK" > ./cpuload-$M.txt &
+	adb shell /data/t.sh > ./cpuload-$M.txt &
 	wl_pid=`adb shell "ps" |grep $TASK|awk '{print $2}'`
 	iperf_pid=`adb shell "ps" |grep iperf|awk '{print $2}'`
 	adb shell "taskset -p 0x1 $wl_pid"
 	adb shell "taskset -p 0x2 $iperf_pid"
-	INT_BCM_START=`adb shell "cat /proc/interrupts"  |grep wl1271|awk '{print $2}'`
-	INT_MMC_START=`adb shell "cat /proc/interrupts"  |grep mmc2|awk '{print $2}'`
+	INT_BCM_START=`adb shell "cat /proc/interrupts"  |grep $IRQ1|awk '{print $2}'`
+	INT_MMC_START=`adb shell "cat /proc/interrupts"  |grep $IRQ2|awk '{print $2}'`
 	sleep $MON_TIME;
-	INT_BCM_STOP=`adb shell "cat /proc/interrupts"  |grep wl1271|awk '{print $2}'`
-	INT_MMC_STOP=`adb shell "cat /proc/interrupts"  |grep mmc2|awk '{print $2}'`
+	INT_BCM_STOP=`adb shell "cat /proc/interrupts"  |grep $IRQ1|awk '{print $2}'`
+	INT_MMC_STOP=`adb shell "cat /proc/interrupts"  |grep $IRQ2|awk '{print $2}'`
 	adb shell "killall -9 top"
-	echo "monitoring top done"
+	
+	echo "monitoring top done a$INT_BCM_START a$INT_BCM_STOP a$INT_MMC_START a$INT_MMC_STOP"
+
 	INT_BCM_TOT=`echo "scale=2;($INT_BCM_STOP - $INT_BCM_START) / $MON_TIME"|bc -l`
 	INT_MMC_TOT=`echo "scale=2;($INT_MMC_STOP - $INT_MMC_START) / $MON_TIME"|bc -l`
 	echo "INT_BCM $INT_BCM_TOT" >> ./cpuload-$M.txt
 	echo "INT_MMC $INT_MMC_TOT" >> ./cpuload-$M.txt
 	sleep $MARGIN;
-	sleep 5	
+	sleep 10	
 
 
 }
@@ -281,7 +297,7 @@ setup()
 
 run_iperf()
 {
-case $1 in
+	case $1 in
 	-all)
 		run -udp_up
 		run -udp_down
@@ -292,7 +308,7 @@ case $1 in
 		;;
 	*)
 		run $1
-esac
+	esac
 
 
 
@@ -303,19 +319,23 @@ esac
 
 
 
-write(){
+write()
+{
 	echo $1"Mbps" >> result.txt
 	cat cpuload-$1.txt|awk '{print $3}'|awk 'BEGIN{FS="%"}{print $1}' >>result.txt
 }
 
 
-calculate()
+RES=0
+average()
 {
 	MAX=0;
 	MIN=0;
 	AVG=0;
 	COUNT=0;
-	cat cpuload-$1.txt|awk '{print $3}'|awk 'BEGIN{FS="%"}{print $1}' >tmp.txt
+	RES=0
+	#dhd_dpc|ksoftirqd
+	cat cpuload-$1.txt|grep $2|awk '{print $3}'|awk 'BEGIN{FS="%"}{print $1}' >tmp.txt
 	while read line; do
 	CUR=$line
 	if [ -z $CUR ];then
@@ -332,16 +352,67 @@ calculate()
 	COUNT=$[$COUNT+1]
 	
 	done< tmp.txt
+
+	AVG=`echo "scale=2;$AVG / $COUNT"|bc -l`
+
+}
+
+calculate()
+{
+
 	INT_BCM=`cat cpuload-$1.txt|grep INT_BCM| awk '{print $2}'`
 	INT_MMC=`cat cpuload-$1.txt|grep INT_MMC| awk '{print $2}'`
-	AVG=`echo "scale=2;$AVG / $COUNT"|bc -l`
-	echo $1"MB = AVG "$AVG " MAX " $MAX " MIN " $MIN " MBPS " $RESULT " INT_BCM " $INT_BCM " INT_MMC " $INT_MMC
+	AMBPS=`cat cpuload-$1.txt|grep ACTUAL_MB| awk '{print $2}'`
+	#dhd_dpc|ksoftirqd
+	average $1 dhd_dpc
+	AVGT1=$AVG
+	average $1 "ksoftirqd/0"
+	AVG2=$AVG
+	average $1 "ksoftirqd/1"
+	AVG3=$AVG
+
+	AVGT2=`echo "scale=2;$AVG2+$AVG3"|bc -l`
+
+	echo $1"MB = AVGT1 "$AVGT1 " AVGT2 "$AVGT2 " MBPS " $AMBPS " INT_BCM " $INT_BCM " INT_MMC " $INT_MMC
+
+	echo $1"MB = AVGT1 "$AVGT1 " AVGT2 "$AVGT2 " MBPS " $AMBPS " INT_BCM " $INT_BCM " INT_MMC " $INT_MMC >>result2.txt
 }
+
+calculate_dir()
+{
+	echo
+	echo $1
+	cd $1
+	calculate 1
+	calculate 5
+	calculate 10
+	calculate 20
+	calculate 25
+	calculate 30
+	calculate 35
+	calculate 40
+	calculate 50
+	calculate 55
+	calculate 60
+	calculate 70
+	calculate 80
+	calculate 90
+	calculate 95
+	calculate 100
+	calculate 200
+	cd ..
+}
+
 
 rtest()
 {
-	M=$1; 
-	run_iperf -udp_down;
+	M=$1 ;
+
+	if [ "$ARG2" = "up" ];then
+		run_iperf -udp_up;
+	else
+		run_iperf -udp_down;
+	fi
 	write $1
 	calculate $1
 }
@@ -349,12 +420,16 @@ rtest()
 
 main()
 {
-	calculate 55
-exit
+	if [ "$ARG2" = "up" ];then
+		echo up
+	else
+		echo down
+	fi
 
+	if [ "q" = "up" ];then
 	setup;
-	rtest 40
-exit
+	rm resrult*
+	rm cpuload*
 
 	rtest 1
 	rtest 5
@@ -367,12 +442,12 @@ exit
 	rtest 50
 	rtest 55
 	rtest 60
-#	rtest 70
-#	rtest 80
-#	rtest 90
-#	rtest 95
-#	rtest 100
-#	rtest 200
+	rtest 70
+	rtest 80
+	rtest 90
+	rtest 95
+	rtest 100
+	rtest 200
 
 	calculate 1
 	calculate 5
@@ -385,13 +460,36 @@ exit
 	calculate 50
 	calculate 55
 	calculate 60
-#	calculate 70
-#	calculate 80
-#	calculate 90
-#	calculate 95
-#	calculate 100
-#	calculate 200
- 
+	calculate 70
+	calculate 80
+	calculate 90
+	calculate 95
+	calculate 100
+	calculate 200
+
+	rm -rf $FOLDER
+	mkdir $FOLDER
+ 	mv cpuload* ./$FOLDER/
+	mv result.txt ./$FOLDER/
+
+	fi
+
+
 }
 
-main;
+#main;
+
+
+
+calculate_dir DOWN1
+calculate_dir DOWN2
+calculate_dir DOWN3
+calculate_dir DOWN4
+calculate_dir DOWN5
+
+calculate_dir UP1
+calculate_dir UP2
+calculate_dir UP3
+calculate_dir UP4
+calculate_dir UP5
+

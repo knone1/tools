@@ -2,7 +2,7 @@
 ####################
 #    SETTINGS
 ####################
-DUT_IP=192.168.1.103
+DUT_IP=192.168.1.100
 PC_IP=192.168.1.24
 ANDROID_IPERF=~/tools/iperf-static
 

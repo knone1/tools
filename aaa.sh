@@ -9,8 +9,8 @@ MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/main/PSI/week
 MANIFEST_FILE=manifest-main-2012_WW33-generated.xml
 
 #PROJECT_DIR=/home/axelh/GITS/MAIN
-PROJECT_DIR=/home/axelh/GITS/R3STABLE
-#PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
+#PROJECT_DIR=/home/axelh/GITS/R3STABLE
+PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
 
 
 FASTBOOT_DIR=axel_fastboot
