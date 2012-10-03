@@ -1,27 +1,28 @@
 # force to be root
 sudo echo ""
 
-#MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/r3/PSI/weekly/2012_WW31/manifest-R3-2012_WW31-generated.xml
-#MANIFEST_FILE=manifest-R3-2012_WW31-generated.xml
-#MANIFEST_URL=http://umgsw-build4.jf.intel.com/absp_builds/r3-weekly_358_60832-2_60251-6_6129..._Martin-Antoine/manifest-generated.xml
-#MANIFEST_FILE=manifest-generated.xml
-MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/main/PSI/weekly/2012_WW33/manifest-main-2012_WW33-generated.xml
-MANIFEST_FILE=manifest-main-2012_WW33-generated.xml
+MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/main/PSI/weekly/latest/manifest-generated.xml
+MANIFEST_FILE=manifest-generated.xml
+
+MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/r3/PSI/weekly/latest/manifest-generated.xml
+MANIFEST_FILE=manifest-generated.xml
 
 #PROJECT_DIR=/home/axelh/GITS/MAIN
 #PROJECT_DIR=/home/axelh/GITS/R3STABLE
-PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
+#PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
+PROJECT_DIR=/home/axelh/GITS/BRCM
+#PROJECT_DIR=/home/axelh/GITS/MAIN2
 
-
-FASTBOOT_DIR=axel_fastboot
-FASTBOOT_REF=$HOME/.flasher/.download/r3/weekly/2012_WW28/MFLD_PRx/flash_files/build-eng/mfld_prx-eng-fastboot-r3-weekly-331
-FASTBOOT_REF=~/.flasher/.download/r3/weekly/2012_WW22/mfld_prx-eng-fastboot-main-weekly-191
-OUT=out/target/product/mfld_pr2
+PLATFORM=mfld_pr2
+OUT=out/target/product/$PLATFORM
 MY_KERNEL=$PROJECT_DIR/$OUT/axel_kernel
 MY_BOOT_DIR=$PROJECT_DIR/$OUT/axel_boot
 MY_RAMDISK=$PROJECT_DIR/$OUT/axel_ramdisk
-PLATFORM=mfld_pr2
-BUILD_TYPE=userdebug
+
+
+#BUILD_TYPE=userdebug
+BUILD_TYPE=eng
+
 BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-panda-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
 CUR_DIR=$PWD
 
@@ -117,39 +118,30 @@ sync_new_project()
 	source build/envsetup.sh
 	lunch $PLATFORM-$BUILD_TYPE
 	make -j8 $PLATFORM
-	make_kernel;
-	make_ramdisk;
+	make -j8 flashfiles
+	make -j8 blank_flashfiles	
 	
 }
 
-sync_existing_project()
-{
-	exit_if_no_file $PROJECT_DIR 
-
-	cd $PROJECT_DIR
-
-	print "REPO SYNC"
+sync_repo()
+{	
+	print "SYNC_REPO $1"
+	cd $1
+	repo forall -c "git pull"
 	repo sync
-
-	#Check that sync worked and try again if not.
-	if [ ! -e $PROJECT_DIR/frameworks ]; then
-		print "REPO SYNC FAILED, TRYING AGAIN"
-		rm -rf $PROJECT_DIR
-		new_project;
-	fi
-
-	print "BUILDING SYSTEM"
 	source build/envsetup.sh
 	lunch $PLATFORM-$BUILD_TYPE
 	make -j8 $PLATFORM
-	make_kernel;
-	make_ramdisk;
-	
+	make flashfiles
+
 }
 
-
-
-
+sync_all()
+{
+	sync_repo /home/axelh/GITS/MAIN
+	sync_repo /home/axelh/GITS/R3STABLE
+	sync_repo /home/axelh/GITS/BRCM
+}
 
 ###############################################################################
 # MAKERS
@@ -157,7 +149,7 @@ sync_existing_project()
 make_kernel()
 {
 	cd $PROJECT_DIR 
-	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/LOCAL/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=$MY_KERNEL"
+	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/GITS/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=$MY_KERNEL"
 
 	if [ ! -e $MY_KERNEL ]; then
 		mkdir $MY_KERNEL
@@ -166,6 +158,10 @@ make_kernel()
 		echo $OUT
 		cp $PROJECT_DIR/$OUT/kernel_build/.config $MY_KERNEL
 	fi		
+
+	if [ ! -e $MY_KERNEL/.config ]; then
+		cp $PROJECT_DIR/$OUT/kernel_build/.config $MY_KERNEL/
+	fi
 	
 	cd $PROJECT_DIR
 	source build/envsetup.sh
@@ -237,9 +233,13 @@ make_bootimage()
 	rm $MY_BOOT_DIR/boot.bin
 
 	source build/envsetup.sh
+#--cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on idle=poll" \
+
+#init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6
+
 
 	vendor/intel/support/mkbootimg \
---cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=8 hsu_dma=7 kmemleak=off androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 ip=50.0.0.2:50.0.0.1::255.255.255.0::usb0:on idle=poll" \
+--cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6" \
 --ramdisk $MY_BOOT_DIR/my_ramdisk.img \
 --kernel $MY_BOOT_DIR/bzImage \
 --output $OUT/axel_boot/boot.bin \
@@ -247,29 +247,13 @@ make_bootimage()
 
 }
 
-make_fastboot_dir()
-{
-	print "Creating fastboot dir form $FASTBOOT_REF"
-	rm -rf $PROJECT_DIR/$OUT/$FASTBOOT_DIR
-	mkdir $PROJECT_DIR/$OUT/$FASTBOOT_DIR
-	cp -rf $FASTBOOT_REF/* $PROJECT_DIR/$OUT/$FASTBOOT_DIR
-	cd $PROJECT_DIR/$OUT/$FASTBOOT_DIR
-	FB_OTA_FILE=`ls *-ota-*.zip`
-
-	cd $PROJECT_DIR/$OUT
-	MY_OTA_FILE=`ls *-ota-*.zip`
-
-	cp $PROJECT_DIR/$OUT/$MY_OTA_FILE $PROJECT_DIR/$OUT/$FASTBOOT_DIR/$FB_OTA_FILE
-}
-
-
 make_broadcom()
 {
 	cd $PROJECT_DIR
 	rm $BRCM_MODULE
 	rm $MY_RAMDISK/lib/modules/bcmdhd.ko
 
-	vendor/intel/support/bcmdhd-build.sh mfld_pr2
+	$PROJECT_DIR/vendor/intel/support/bcmdhd-build.sh mfld_pr2
 	exit_if_no_file $BRCM_MODULE
 
 	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
@@ -279,6 +263,15 @@ make_broadcom()
 	make_bootimage;
 }
 
+make_flash_files()
+{
+	cd $PROJECT_DIR
+	source build/envsetup.sh
+	lunch $PLATFORM-$BUILD_TYPE
+	make -j8 $PLATFORM 
+	make -j8 flashfiles
+	make -j8 blank_flashfiles
+}
 
 
 
@@ -382,24 +375,24 @@ usage()
 echo "
 USAGE IS:
 	sn)	sync_new_project;break;;
-	se)	sync_existing_project;break;;
+	sa)	sync_all;break;;
 
 	mk)	make_kernel;break;;
-	mf)	make_fastboot_dir;break;;
 	mb)	make_bootimage;break;;
 	mq)	make_broadcom;break;;
 	mr)	make_ramdisk;break;;
 	mw)	make_wireless;break;;
+	mf)	make_flash_files;break;;
 
 	fb)	flash_my_boot;break;;
 	ff)	flash_my_build;break;;
 	ft)	flash_this;break;;
 
-	po)	power_on;break;;
-	pf)	power_off;break;;
-	pr)	power_restart;break;;
-	uo)	usb_on;break;;
-	uf)	usb_off;break;;
+	pon)	power_on;break;;
+	poff)	power_off;break;;
+	prst)	power_restart;break;;
+	uon)	usb_on;break;;
+	uoff)	usb_off;break;;
 	cd)	goto_project;break;;
 	
 	rs)	run_syncer;break;;
@@ -423,24 +416,24 @@ init;
 while [ ! -z "$1" ]; do
 	case $1 in
 	sn)	sync_new_project;break;;
-	se)	sync_existing_project;break;;
+	sa)	sync_all;break;;
 
 	mk)	make_kernel;break;;
-	mf)	make_fastboot_dir;break;;
 	mb)	make_bootimage;break;;
 	mq)	make_broadcom;break;;
 	mr)	make_ramdisk;break;;
 	mw)	make_wireless;break;;
+	mf)	make_flash_files;break;;
 
 	fb)	flash_my_boot;break;;
 	ff)	flash_my_build;break;;
 	ft)	flash_this;break;;
 
-	po)	power_on;break;;
-	pf)	power_off;break;;
-	pr)	power_restart;break;;
-	uo)	usb_on;break;;
-	uf)	usb_off;break;;
+	pon)	power_on;break;;
+	poff)	power_off;break;;
+	prst)	power_restart;break;;
+	uon)	usb_on;break;;
+	uoff)	usb_off;break;;
 	cd)	goto_project;break;;
 	
 	rs)	run_syncer;break;;

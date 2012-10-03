@@ -15,10 +15,10 @@ DIR=$PWD
 TEST="NONE"
 W=64k
 
-TIME=30
+TIME=50
 MARGIN=5
 M=$2
-MON_TIME=10
+MON_TIME=30
 ARG1=$1
 ARG2=$2
 
@@ -133,13 +133,13 @@ clean()
 monitor_top()
 {
 
-#	TASK=irq/258
-#	IRQ1=wl1271
-#	IRQ2=mmc2
-
-	TASK="dhd_dpc"
-	IRQ1=bcmsdh_sdmmc
+	TASK=irq/258
+	IRQ1=wl1271
 	IRQ2=mmc2
+
+#	TASK="dhd_dpc"
+#	IRQ1=bcmsdh_sdmmc
+#	IRQ2=mmc2
 
 #	sh echo "top -d 0|egrep \042$TASK\042" > ./t.sh
 
@@ -363,8 +363,10 @@ calculate()
 	INT_BCM=`cat cpuload-$1.txt|grep INT_BCM| awk '{print $2}'`
 	INT_MMC=`cat cpuload-$1.txt|grep INT_MMC| awk '{print $2}'`
 	AMBPS=`cat cpuload-$1.txt|grep ACTUAL_MB| awk '{print $2}'`
-	#dhd_dpc|ksoftirqd
-	average $1 dhd_dpc
+	#BRCM dhd_dpc|ksoftirqid
+	#TI irq/258
+
+	average $1 irq/258
 	AVGT1=$AVG
 	average $1 "ksoftirqd/0"
 	AVG2=$AVG
@@ -394,12 +396,12 @@ calculate_dir()
 	calculate 50
 	calculate 55
 	calculate 60
-	calculate 70
-	calculate 80
-	calculate 90
-	calculate 95
-	calculate 100
-	calculate 200
+#	calculate 70
+#	calculate 80
+#	calculate 90
+#	calculate 95
+#	calculate 100
+#	calculate 200
 	cd ..
 }
 
@@ -426,7 +428,6 @@ main()
 		echo down
 	fi
 
-	if [ "q" = "up" ];then
 	setup;
 	rm resrult*
 	rm cpuload*
@@ -442,12 +443,12 @@ main()
 	rtest 50
 	rtest 55
 	rtest 60
-	rtest 70
-	rtest 80
-	rtest 90
-	rtest 95
-	rtest 100
-	rtest 200
+#	rtest 70
+#	rtest 80
+#	rtest 90
+#	rtest 95
+#	rtest 100
+#	rtest 200
 
 	calculate 1
 	calculate 5
@@ -460,33 +461,29 @@ main()
 	calculate 50
 	calculate 55
 	calculate 60
-	calculate 70
-	calculate 80
-	calculate 90
-	calculate 95
-	calculate 100
-	calculate 200
+#	calculate 70
+#	calculate 80
+#	calculate 90
+#	calculate 95
+#	calculate 100
+#	calculate 200
 
 	rm -rf $FOLDER
 	mkdir $FOLDER
  	mv cpuload* ./$FOLDER/
 	mv result.txt ./$FOLDER/
 
-	fi
 
 
 }
 
-#main;
+main;
 
-
-
+exit
 calculate_dir DOWN1
 calculate_dir DOWN2
 calculate_dir DOWN3
 calculate_dir DOWN4
-calculate_dir DOWN5
-
 calculate_dir UP1
 calculate_dir UP2
 calculate_dir UP3
