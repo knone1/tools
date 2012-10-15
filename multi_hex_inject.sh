@@ -1,18 +1,18 @@
 sudo echo ""
 
 ####################################################################################
-INTERFACE=eth0
+INTERFACE=wlan0
 INJECT="/home/axelh/hexinject-1.4.1/hexinject/hexinject -p -i $INTERFACE"
 
 #SOURCE MAC ADDRESS
-SRC=080028710745
+SRC=0811966fd8a0 
 
 #LIST OF RANDOM DEST MAC TO USE
 MAC1=a00bbaafea53
-MAC2=ccf3a529654a
-MAC3=080028f22b63
-MAC4=ccf3a5296548
-MAC5=98fe94011394
+MAC2=ccf3a5296542
+MAC3=333300000000
+MAC4=ffffffffffff
+MAC5=ffffffffffff
 
 ####################################################################################
 #NBNS_IPv4_broadcast()

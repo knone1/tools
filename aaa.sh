@@ -4,14 +4,15 @@ sudo echo ""
 MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/main/PSI/weekly/latest/manifest-generated.xml
 MANIFEST_FILE=manifest-generated.xml
 
-MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/r3/PSI/weekly/latest/manifest-generated.xml
-MANIFEST_FILE=manifest-generated.xml
+#MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/r3/PSI/weekly/latest/manifest-generated.xml
+#MANIFEST_FILE=manifest-generated.xml
 
 #PROJECT_DIR=/home/axelh/GITS/MAIN
 #PROJECT_DIR=/home/axelh/GITS/R3STABLE
 #PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
 PROJECT_DIR=/home/axelh/GITS/BRCM
 #PROJECT_DIR=/home/axelh/GITS/MAIN2
+#PROJECT_DIR=/home/axelh/GITS/MAIN3
 
 PLATFORM=mfld_pr2
 OUT=out/target/product/$PLATFORM
@@ -19,6 +20,8 @@ MY_KERNEL=$PROJECT_DIR/$OUT/axel_kernel
 MY_BOOT_DIR=$PROJECT_DIR/$OUT/axel_boot
 MY_RAMDISK=$PROJECT_DIR/$OUT/axel_ramdisk
 
+BRANCH=main
+#BRANCH=r3-stable
 
 #BUILD_TYPE=userdebug
 BUILD_TYPE=eng
@@ -83,6 +86,7 @@ init()
 	ln -s $PROJECT_DIR $HOME/project
 	ln -s $PROJECT_DIR/hardware/intel/linux-2.6 $PROJECT_DIR/kernel
 	ln -s $PROJECT_DIR/$OUT $PROJECT_DIR/outp
+	ln -s $PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm43xx brcm
 }
 
 ###############################################################################
@@ -111,7 +115,7 @@ sync_new_project()
 	if [ ! -e $PROJECT_DIR/frameworks ]; then
 		print "REPO SYNC FAILED, TRYING AGAIN"
 		rm -rf $PROJECT_DIR
-		new_project;
+		sync_new_project
 	fi
 
 	print "BUILDING SYSTEM"
@@ -126,9 +130,11 @@ sync_new_project()
 sync_repo()
 {	
 	print "SYNC_REPO $1"
-	cd $1
-	repo forall -c "git pull"
+	cd $PROJECT_DIR
+	repo forall -c "git checkout --track -b $BRANCH $REMOTE_BRANCH"
+	repo forall -c "git reset --hard HEAD~10"
 	repo sync
+
 	source build/envsetup.sh
 	lunch $PLATFORM-$BUILD_TYPE
 	make -j8 $PLATFORM
@@ -138,9 +144,15 @@ sync_repo()
 
 sync_all()
 {
-	sync_repo /home/axelh/GITS/MAIN
-	sync_repo /home/axelh/GITS/R3STABLE
-	sync_repo /home/axelh/GITS/BRCM
+	PROJECT_DIR=/home/axelh/GITS/MAIN2
+	REMOTE_BRANCH=remotes/umg/platform/android/main
+	BRANCH=main
+	sync_repo
+
+	PROJECT_DIR=/home/axelh/GITS/R3STABLE
+	REMOTE_BRANCH=remotes/umg/platform/android/r3-stable
+	BRANCH=r3-stable
+	sync_repo
 }
 
 ###############################################################################
@@ -196,6 +208,7 @@ make_kernel()
 make_wireless()
 {
 	cd $PROJECT_DIR
+#	cp ~/tools/wl12xx-compat-build-axel2.sh vendor/intel/support/wl12xx-compat-build-axel2.sh
 	vendor/intel/support/wl12xx-compat-build.sh -c mfld_pr2
 	
 	find $PROJECT_DIR/$OUT/compat_modules/lib/modules -iname "*.ko" -exec cp -rf "{}" $MY_RAMDISK/lib/modules \;
@@ -237,9 +250,10 @@ make_bootimage()
 
 #init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6
 
+#init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6 androidboot.wakesrc=0B androidboot.mode=main androidboot.wakesrc=0B androidboot.mode=main ignore_bt_lpm androidboot.wakesrc=0B androidboot.mode=main
 
 	vendor/intel/support/mkbootimg \
---cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6" \
+--cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6 androidboot.wakesrc=0B androidboot.mode=main androidboot.wakesrc=0B androidboot.mode=main ignore_bt_lpm" \
 --ramdisk $MY_BOOT_DIR/my_ramdisk.img \
 --kernel $MY_BOOT_DIR/bzImage \
 --output $OUT/axel_boot/boot.bin \
@@ -255,10 +269,9 @@ make_broadcom()
 
 	$PROJECT_DIR/vendor/intel/support/bcmdhd-build.sh mfld_pr2
 	exit_if_no_file $BRCM_MODULE
-
-	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
 	exit_if_no_file $MY_RAMDISK/lib/modules
 
+	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
 	make_ramdisk;
 	make_bootimage;
 }
@@ -417,6 +430,7 @@ while [ ! -z "$1" ]; do
 	case $1 in
 	sn)	sync_new_project;break;;
 	sa)	sync_all;break;;
+	sr)	sync_repo;break;;
 
 	mk)	make_kernel;break;;
 	mb)	make_bootimage;break;;
