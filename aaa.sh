@@ -7,11 +7,9 @@ MANIFEST_FILE=manifest-generated.xml
 #MANIFEST_URL=http://jfumgbuild-depot.jf.intel.com/build/eng-builds/r3/PSI/weekly/latest/manifest-generated.xml
 #MANIFEST_FILE=manifest-generated.xml
 
-#PROJECT_DIR=/home/axelh/GITS/MAIN
 #PROJECT_DIR=/home/axelh/GITS/R3STABLE
 #PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
 PROJECT_DIR=/home/axelh/GITS/BRCM
-#PROJECT_DIR=/home/axelh/GITS/MAIN2
 #PROJECT_DIR=/home/axelh/GITS/MAIN3
 
 PLATFORM=mfld_pr2
@@ -26,7 +24,11 @@ BRANCH=main
 #BUILD_TYPE=userdebug
 BUILD_TYPE=eng
 
-BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-panda-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
+BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-intel-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
+
+#BRCM_MODULE=/home/axelh/GITS/BRCM/hardware/broadcom/PRIVATE/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-panda-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
+
+
 CUR_DIR=$PWD
 
 ARG1=$1
@@ -131,7 +133,7 @@ sync_repo()
 {	
 	print "SYNC_REPO $1"
 	cd $PROJECT_DIR
-	repo forall -c "git checkout --track -b $BRANCH $REMOTE_BRANCH"
+	#repo forall -c "git checkout --track -b $BRANCH $REMOTE_BRANCH"
 	repo forall -c "git reset --hard HEAD~10"
 	repo sync
 
@@ -253,7 +255,7 @@ make_bootimage()
 #init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6 androidboot.wakesrc=0B androidboot.mode=main androidboot.wakesrc=0B androidboot.mode=main ignore_bt_lpm androidboot.wakesrc=0B androidboot.mode=main
 
 	vendor/intel/support/mkbootimg \
---cmdline "init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6 androidboot.wakesrc=0B androidboot.mode=main androidboot.wakesrc=0B androidboot.mode=main ignore_bt_lpm" \
+--cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2" \
 --ramdisk $MY_BOOT_DIR/my_ramdisk.img \
 --kernel $MY_BOOT_DIR/bzImage \
 --output $OUT/axel_boot/boot.bin \
@@ -274,6 +276,11 @@ make_broadcom()
 	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
 	make_ramdisk;
 	make_bootimage;
+	cd ~/GITS/BRCM/brcm/firmware/4334b1min-roml
+	echo "push BRCM FW..."
+	adb root
+	adb remount
+	adb push sdio-ag-pno-p2p-proptxstatus-dmatxrc-rxov-pktfilter-keepalive-aoe-vsdb-mchan.bin /system/etc/firmware/fw_bcmdhd.bin
 }
 
 make_flash_files()

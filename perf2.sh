@@ -15,7 +15,7 @@ TEST="NONE"
 W=64k
 PT=30
 TEST_TIME=35
-M=$2
+M=200
 
 usage()
 {
@@ -64,14 +64,14 @@ pc_udp_down()
 
 dut_udp_up()
 {
-	echo "dut_udp_up /data/iperf-static -u -c $PC_IP -b 200M -t 10"
-	adb shell "/data/iperf-static -u -c $PC_IP -b 10M -t $PT > /data/iperf_client.txt" &
+	echo "dut_udp_up /data/iperf-static -u -c $PC_IP -b $M"M" -t 10"
+	adb shell "/data/iperf-static -u -c $PC_IP -b $M"M" -t $PT > /data/iperf_client.txt" &
 }
 
 dut_tcp_up()
 {
-	echo "dut_tcp_up /data/iperf-static -c $PC_IP -t 10 -i 5 -w $W"
-	adb shell "/data/iperf-static -c $PC_IP -t $PT -i 5 -w $W > /data/iperf_client.txt" &
+	echo "dut_tcp_up /data/iperf-static -c $PC_IP -t $PT -i 1 -w $W"
+	adb shell "/data/iperf-static -c $PC_IP -t $PT -i 1 -w $W > /data/iperf_client.txt" &
 }
 
 dut_tcp_down()
@@ -89,8 +89,8 @@ pc_udp_up()
 
 pc_tcp_down()
 {
-	echo "pc_tcp_down iperf -c $DUT_IP -t 10 -i 5 -w $W"
-	iperf -c $DUT_IP -t $PT -i 5 -w $W > $DIR/iperf_client.txt &
+	echo "pc_tcp_down iperf -c $DUT_IP -t $PT -i 1 -w $W"
+	iperf -c $DUT_IP -t $PT -i 1 -w $W > $DIR/iperf_client.txt &
 }
 
 pc_tcp_up()
@@ -119,7 +119,7 @@ clean()
 	rm $DIR/iperf_server.txt
 
 	echo  "$TEST $RESULT"
-	echo  "$TEST $RESULT" >>$DIR/iperf_result.txt
+	echo  "AXRES $TEST $RESULT" >>$DIR/iperf_result.txt
 }
 
 run()
@@ -214,6 +214,7 @@ setup()
 	adb pull /data/ifconfig.txt $DIR  2>/dev/null 
 	DEVIP=`cat $DIR/ifconfig.txt |grep "inet addr"|tail -1|awk 'BEGIN{FS=":"}{printf $2"\n"}'|awk 'BEGIN{FS=" "}{printf $1"\n"}'`
 	echo "Device ip... $DEVIP"
+	DUT_IP=$DEVIP
 	if [ "$DUT_IP" = "$DEVIP" ];then
 		echo "Device ip... OK"
 	else
