@@ -9,10 +9,13 @@ MANIFEST_FILE=manifest-generated.xml
 
 #PROJECT_DIR=/home/axelh/GITS/R3STABLE
 #PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
-PROJECT_DIR=/home/axelh/GITS/BRCM
+#PROJECT_DIR=/home/axelh/GITS/BRCM
 #PROJECT_DIR=/home/axelh/GITS/MAIN3
+PROJECT_DIR=/home/axelh/GITS/BRCM_MAIN
 
+#PLATFORM=mfld_pr2
 PLATFORM=mfld_pr2
+
 OUT=out/target/product/$PLATFORM
 MY_KERNEL=$PROJECT_DIR/$OUT/axel_kernel
 MY_BOOT_DIR=$PROJECT_DIR/$OUT/axel_boot
@@ -22,12 +25,13 @@ BRANCH=main
 #BRANCH=r3-stable
 
 #BUILD_TYPE=userdebug
-BUILD_TYPE=eng
+#BUILD_TYPE=eng
+BUILD_TYPE=mfld_pr2_bcm-eng
 
-BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-intel-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
 
+#BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm4335/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-intel-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
 #BRCM_MODULE=/home/axelh/GITS/BRCM/hardware/broadcom/PRIVATE/wlan/bcm43xx/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-panda-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
-
+BRCM_MODULE=~/GITS/BRCM_MAIN/hardware/broadcom/PRIVATE/wlan/bcm4334/open-src/src/dhd/linux/cdc-sdmmc-android-intel-jellybean-cfg80211-oob-3.0.34/bcmdhd.ko
 
 CUR_DIR=$PWD
 
@@ -88,7 +92,9 @@ init()
 	ln -s $PROJECT_DIR $HOME/project
 	ln -s $PROJECT_DIR/hardware/intel/linux-2.6 $PROJECT_DIR/kernel
 	ln -s $PROJECT_DIR/$OUT $PROJECT_DIR/outp
-	ln -s $PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm43xx brcm
+	ln -s $PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm4334 bcm4334
+	ln -s $PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm4335 bcm4335
+
 }
 
 ###############################################################################
@@ -104,6 +110,7 @@ sync_new_project()
 	print "REPO INIT $MANIFEST_FILE"
 	repo init -u git://android.intel.com/manifest -b platform/android/main -m android-main
 
+
 	print "SETTING MAINFEST $MANIFEST_FILE"
 	wget $MANIFEST_URL
 	sed -i 's/jfumg-gcrmirror.jf.intel.com/ncsgit001.nc.intel.com/g' ./$MANIFEST_FILE
@@ -112,6 +119,8 @@ sync_new_project()
 
 	print "REPO SYNC"
 	repo sync
+
+	repo init -u git://android.intel.com/manifest -b /platform/android/main -m broadcom
 
 	#Check that sync worked and try again if not.
 	if [ ! -e $PROJECT_DIR/frameworks ]; then
@@ -122,8 +131,8 @@ sync_new_project()
 
 	print "BUILDING SYSTEM"
 	source build/envsetup.sh
-	lunch $PLATFORM-$BUILD_TYPE
-	make -j8 $PLATFORM
+	lunch $BUILD_TYPE
+	make -j8 $BUILD_TYPE
 	make -j8 flashfiles
 	make -j8 blank_flashfiles	
 	
@@ -138,7 +147,7 @@ sync_repo()
 	repo sync
 
 	source build/envsetup.sh
-	lunch $PLATFORM-$BUILD_TYPE
+	lunch $BUILD_TYPE
 	make -j8 $PLATFORM
 	make flashfiles
 
@@ -163,8 +172,18 @@ sync_all()
 make_kernel()
 {
 	cd $PROJECT_DIR 
-	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/GITS/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=$MY_KERNEL"
+#	source ./build/envsetup.sh
+#	lunch mfld_pr2_bcm-eng
+	make -j8 bootimage
+	find  $PROJECT_DIR/$OUT/kernel_modules/lib/modules -iname "*.ko" -exec cp -rf "{}" $MY_RAMDISK/lib/modules \;
+	cd $MY_RAMDISK/lib/modules
+	find . -type f -name '*.ko' | xargs -n 1 ~/GITS/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux-objcopy --strip-unneeded
+	cp $PROJECT_DIR/$OUT/kernel_build/arch/x86/boot/bzImage $MY_BOOT_DIR
+	make_ramdisk	
+	exit;
 
+	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/GITS/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux- -j8 O=$MY_KERNEL"
+	KFLAGS="ARCH=x86 CROSS_COMPILER=/home/axelh/GITS/BRCM_MAIN/prebuilts/gcc/linux-x86/x86/i686-linux-android-4.6/bin/i686-linux-android- -j8 O=$MY_KERNEL"
 	if [ ! -e $MY_KERNEL ]; then
 		mkdir $MY_KERNEL
 		echo "ddd"
@@ -198,7 +217,7 @@ make_kernel()
 	make $KFLAGS modules
 #	rm -rf $MY_RAMDISK/lib/modules/*
 
-	echo copy
+	echo "Search and copy Modules"
 	find  $MY_KERNEL -iname "*.ko" -exec cp -rf "{}" $MY_RAMDISK/lib/modules \;
 
 
@@ -212,8 +231,11 @@ make_wireless()
 	cd $PROJECT_DIR
 #	cp ~/tools/wl12xx-compat-build-axel2.sh vendor/intel/support/wl12xx-compat-build-axel2.sh
 	vendor/intel/support/wl12xx-compat-build.sh -c mfld_pr2
+	cd $PROJECT_DIR/hardware/ti/wlan
+	find . -iname "*.ko" -exec cp -rf "{}" $MY_RAMDISK/lib/modules \;
 	
-	find $PROJECT_DIR/$OUT/compat_modules/lib/modules -iname "*.ko" -exec cp -rf "{}" $MY_RAMDISK/lib/modules \;
+	cd $MY_RAMDISK/lib/modules
+	find . -type f -name '*.ko' | xargs -n 1 ~/GITS/toolchain/i686-android-linux-4.4.3/bin/i686-android-linux-objcopy --strip-unneeded
 	make_ramdisk;
 }
 
@@ -230,8 +252,8 @@ make_ramdisk()
 		gunzip -c ../ramdisk.img | cpio -i
 	fi
 
-	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
-	cp $PROJECT_DIR/$OUT/target/product/mfld_pr2/root/init $MY_RAMDISK/init
+#	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
+#	cp $PROJECT_DIR/$OUT/target/product/mfld_pr2/root/init $MY_RAMDISK/init
 
 	cd $MY_RAMDISK
 	find . | cpio -o -H newc | gzip > $MY_BOOT_DIR/my_ramdisk.img
@@ -244,6 +266,8 @@ make_bootimage()
 	cd $PROJECT_DIR
 
 	exit_if_no_file $MY_BOOT_DIR/my_ramdisk.img
+	cp $OUT/kernel_build/arch/x86/boot/bzImage $MY_BOOT_DIR/bzImage
+	cd $PROJECT_DIR
 	exit_if_no_file $MY_BOOT_DIR/bzImage
 	rm $MY_BOOT_DIR/boot.bin
 
@@ -255,7 +279,7 @@ make_bootimage()
 #init=/init pci=noearly console=ttyMFD3 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=6 androidboot.wakesrc=0B androidboot.mode=main androidboot.wakesrc=0B androidboot.mode=main ignore_bt_lpm androidboot.wakesrc=0B androidboot.mode=main
 
 	vendor/intel/support/mkbootimg \
---cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2" \
+--cmdline "init=/init pci=noearly console=ttyS0 console=logk0 earlyprintk=nologger loglevel=7 hsu_dma=7 kmemleak=off ptrace.ptrace_can_access=1 androidboot.bootmedia=sdcard androidboot.hardware=mfld_pr2 emmc_ipanic.ipanic_part_number=1" \
 --ramdisk $MY_BOOT_DIR/my_ramdisk.img \
 --kernel $MY_BOOT_DIR/bzImage \
 --output $OUT/axel_boot/boot.bin \
@@ -276,11 +300,15 @@ make_broadcom()
 	cp $BRCM_MODULE $MY_RAMDISK/lib/modules
 	make_ramdisk;
 	make_bootimage;
-	cd ~/GITS/BRCM/brcm/firmware/4334b1min-roml
+
+
+#	cd ~/GITS/BRCM/brcm/firmware/4334b1min-roml
+#	cd ~/GITS/BRCM_MAIN/hardware/broadcom/PRIVATE/wlan/bcm4334/firmware/4334b1min-roml/
+#	cd ~/GITS/BRCM_MAIN/hardware/broadcom/PRIVATE/wlan/bcm4334/firmware/4335a0min-roml/
 	echo "push BRCM FW..."
-	adb root
-	adb remount
-	adb push sdio-ag-pno-p2p-proptxstatus-dmatxrc-rxov-pktfilter-keepalive-aoe-vsdb-mchan.bin /system/etc/firmware/fw_bcmdhd.bin
+#	adb root
+#	adb remount
+#	adb push ./fw_bcmdhd.bin  /system/etc/firmware/fw_bcmdhd.bin
 }
 
 make_flash_files()

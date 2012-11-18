@@ -20,6 +20,10 @@ DEBUG=0
 #CONSTANTS
 START_PATH=$PWD
 
+GERRIT="git://android.intel.com"
+SERVER="android.intel.com"
+USER=ahaslamx
+
 debug_print() 
 {
 	if [ $DEBUG -eq 1 ]; then
@@ -34,6 +38,20 @@ sanity()
 		exit 1;
 	fi
 	REPO_ROOT=$PWD
+}
+
+set_brcm()
+{
+	ISBRCM=1
+	GERRIT=ssh://$USER@mcg-pri-gcr.jf.intel.com
+	SERVER=mcg-pri-gcr.jf.intel.com
+}
+
+set_intel()
+{
+	ISBRCM=0
+	GERRIT=git://android.intel.com
+	SERVER=android.intel.com
 }
 
 is_patch_present()
@@ -60,6 +78,8 @@ is_patch_present()
 		ISPRESENT=1
 	fi
 	cd $REPO_ROOT
+
+	
 
 	debug_print "is_patch_present ISPRESENT" $ISPRESENT
 }
@@ -100,6 +120,22 @@ fix_dir_quirk()
 	if [ "$PROJECT_DIR" = "platform/frameworks/base/" ]; then
 		PROJECT_DIR="frameworks/base/"
 	fi
+	if [ "$PROJECT_DIR" = "platform/hardware/ti/wlan/" ]; then
+		PROJECT_DIR="hardware/ti/wlan/"
+	fi
+	if [ "$PROJECT_DIR" = "platform/external/wpa_supplicant_8/" ]; then
+		PROJECT_DIR="hardware/intel/PRIVATE/wpa_supplicant_8/"
+	fi
+	if [ "$PROJECT_DIR" = "platform/hardware/broadcom/wlan/" ]; then
+		PROJECT_DIR="hardware/broadcom/wlan/"
+	fi
+	if [ "$PROJECT_DIR" = "platform/system/core/" ]; then
+		PROJECT_DIR="system/core/"
+	fi
+	if [ "$PROJECT_DIR" = "platform/system/netd/" ]; then
+		PROJECT_DIR="system/netd/"
+	fi
+
 	debug_print "fix_dir_quirk exit $PROJECT_DIR"
 
 }
@@ -115,11 +151,8 @@ get_patch_data()
 
 	#go to some git dir, to be able to talk to gerrit
 	cd build
-	if [ $ISBRCM -eq 1 ]; then
-		ssh -p 29418 mcg-pri-gcr.jf.intel.com gerrit query --current-patch-set $PATCH_NUMBER > t.txt
-	else
-		ssh -p 29418 android.intel.com gerrit query --current-patch-set $PATCH_NUMBER > t.txt
-	fi
+
+	ssh -p 29418 $SERVER gerrit query --current-patch-set $PATCH_NUMBER > t.txt
 	
 	#parse the info
 	PATCH_INFO=`cat t.txt`
@@ -178,14 +211,20 @@ apply_patch()
 	debug_print "apply_patch ISPRESENT $ISPRESENT ISDIROK $ISDIROK"
 
 	if [ $ISPRESENT -eq 0 ]; then	
-		if [ $ISBRCM -eq 1 ]; then
-			git fetch ssh://ahaslamx@mcg-pri-gcr.jf.intel.com:29418/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git cherry-pick FETCH_HEAD
-		else
-			git fetch git://android.intel.com/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git cherry-pick FETCH_HEAD
+		git fetch $GERRIT/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git cherry-pick FETCH_HEAD
+		#check if apply worked.
+		git show>/dev/null>temp.txt
+		ISPRESENT2=`cat temp.txt|grep $CHANGEID`
+		if [ -z "$ISPRESENT2" ]; then
+			echo "ERROR APPLING PATCH!!! $PATCH_NUMBER "
+			exit 1;
 		fi
+
 	else
 		echo "PATCH $PATCH_NUMBER is present, not apply"
 	fi
+	
+
 	cd $REPO_ROOT
 }
 
@@ -207,24 +246,28 @@ clean_argument()
 {
 	ISDIRTY=`echo $1|egrep "android.intel.com|mcg-pri-gcr.jf.intel.com"`
 	if [ ! -z $ISDIRTY ]; then
-		#extract BZID.
+		#extract GERRIT number.
 		CLEAN=`echo $ISDIRTY|awk '
 		BEGIN{FS="/"}
 		{
 			i = NF -1
 			print $i
 		}'`
+
+		ISBRCM=`echo $1|egrep "mcg-pri-gcr.jf.intel.com"`
+		if [ ! -z $ISBRCM ]; then
+			set_brcm
+		else
+			set_intel
+		fi
+
 	else
 		CLEAN=$1
 	fi
-
 	debug_print "clean_argument $1 cleaned is:$CLEAN"
 }
 
-set_brcm()
-{
-	ISBRCM=1
-}
+
 
 get_patch()
 {
@@ -232,34 +275,32 @@ get_patch()
 	cd $REPO_ROOT/$PROJECT_DIR
 
 	echo "Getting Patch ... $PATCH_NUMBER"
-	if [ $ISBRCM -eq 1 ]; then
-		debug_print "get_patch git fetch ssh://ahaslamx@mcg-pri-gcr.jf.intel.com/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch"
-		git fetch ssh://ahaslamx@mcg-pri-gcr.jf.intel.com/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch
-	else
-		debug_print "git fetch git://android.intel.com/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch"
-		git fetch git://android.intel.com/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch
-	fi
+	debug_print "get_patch git fetch $GERRIT/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch"
+	git fetch  $GERRIT/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch
 	cd $REPO_ROOT
 	
 }
 
-run_action()
+read_from_file()
 {
-	sanity;
-	clean_argument $1;
-	get_patch_data $CLEAN;
+	PATCHES=""
+	while read line
+	do
+		PATCHES+=" "$line	
+	done < $1
+	echo  $PATCHES
 
-	debug_print "run_action MODE $MODE $1"
-
-	case $MODE in
-	0)patchReport;;
-	1)patchReportShort;;
-	2)apply_patch;;
-	3)revert_patch;;
-	4)get_patch;;
-	*)echo "UNKNOWN MODE $MODE" ;;
-	esac
+	#run list of patches..
+	main $PATCHES		
 }
+
+set_user()
+{
+	echo "USER=$USER"
+	USER=$1
+	echo "USER=$USER"
+}
+
 
 usage()
 {
@@ -294,10 +335,31 @@ of the repo.
 
 "
 
-
-
 }
 
+
+# this runs for each argument that is not 
+# parced by main
+run_action()
+{
+
+	sanity;
+	clean_argument $1;
+	get_patch_data $CLEAN;
+
+	debug_print "run_action MODE $MODE $1"
+
+	case $MODE in
+	0)patchReport;;
+	1)patchReportShort;;
+	2)apply_patch;;
+	3)revert_patch;;
+	4)get_patch;;
+	*)echo "UNKNOWN MODE $MODE" ;;
+	esac
+}
+
+#main state machine
 main ()
 {
 	while [ ! -z "$1" ]; do
@@ -309,7 +371,9 @@ main ()
 		-revert) MODE=3;;
 		-brcm) set_brcm;;
 		-gp) MODE=4;;
+		-f) read_from_file $2;exit;;
 		-DEBUG) DEBUG=1;;
+		-user) set_user $2; shift;;
 		-help) usage;exit;;
 		-help)	usage;exit;;
 		--help) usage;exit;;
@@ -320,4 +384,6 @@ main ()
 }
 
 main "$@";
+
+
 
