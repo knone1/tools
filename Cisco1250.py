@@ -905,9 +905,9 @@ class Cisco1250():
 
             # set_wifi_standard restarts the needed radios
             self.set_wifi_standard(standard_type)
-
+	    self._send_cmd("end") # exit configure
         finally:
-            self._send_cmd("end") # exit configure
+            self._send_cmd("copy running-config startup-config") # exit configure
         
         # Wait for configuration time end
         time.sleep(configuration_timer)
@@ -1053,7 +1053,8 @@ def main():
                             voip,
                             radiusip = "192.168.0.150",
                             radiusport = "1812",
-                            radiussecret = "RadiusPass")
+	                            radiussecret = "RadiusPass")
+
         ret = 0
     except:
         print "### error: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], traceback.print_tb(sys.exc_info()[2]))

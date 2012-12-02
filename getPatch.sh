@@ -9,6 +9,7 @@ ISPRESENT=0
 ISDIROK=0
 SUBJECT=0
 RAWDATA=0
+PATCHSET=0
 
 #PROGRAM FLOW
 MODE=1  
@@ -68,7 +69,7 @@ is_patch_present()
 	fi
 
 	#find the change if on the git log.
-	ISPRESENT=`cat temp.txt|grep $CHANGEID`	
+	ISPRESENT=`cat temp.txt|grep $CHANGEID`
 
 	rm temp.txt
 
@@ -78,8 +79,6 @@ is_patch_present()
 		ISPRESENT=1
 	fi
 	cd $REPO_ROOT
-
-	
 
 	debug_print "is_patch_present ISPRESENT" $ISPRESENT
 }
@@ -107,42 +106,32 @@ clean_vars()
 	ISDIROK=0
 	SUBJECT=0
 	RAWDATA=0
-
+	PATCHSET=0
 }
 
+#some projects patch are not the same as project git.
 fix_dir_quirk()
 {
 	debug_print "fix_dir_quirk enter $PROJECT_DIR"
-	#some projects patch are not the same as project git.
-	if [ "$PROJECT_DIR" = "platform/system/bluetooth/" ]; then
-		PROJECT_DIR="system/bluetooth/"
-	fi
-	if [ "$PROJECT_DIR" = "platform/frameworks/base/" ]; then
-		PROJECT_DIR="frameworks/base/"
-	fi
-	if [ "$PROJECT_DIR" = "platform/hardware/ti/wlan/" ]; then
-		PROJECT_DIR="hardware/ti/wlan/"
-	fi
-	if [ "$PROJECT_DIR" = "platform/external/wpa_supplicant_8/" ]; then
-		PROJECT_DIR="hardware/intel/PRIVATE/wpa_supplicant_8/"
-	fi
-	if [ "$PROJECT_DIR" = "platform/hardware/broadcom/wlan/" ]; then
-		PROJECT_DIR="hardware/broadcom/wlan/"
-	fi
-	if [ "$PROJECT_DIR" = "platform/system/core/" ]; then
-		PROJECT_DIR="system/core/"
-	fi
-	if [ "$PROJECT_DIR" = "platform/system/netd/" ]; then
-		PROJECT_DIR="system/netd/"
-	fi
 
+	BAD_PRJECT=`echo $PROJECT_DIR|head -c -2`
+	#search manifest to find project path.
+	#GOOD_PRJECT=`find ./.repo/manifests/ -name "*.xml" -print0 | xargs -0 cat -n "$2" 2>/dev/null|grep -m1 "$BAD_PRJECT"|awk 'BEGIN{FS="path"}{print $2}'|cut -b 2-|awk 'BEGIN{FS="name|,|\""}{print $1}'`
+	GOOD_PROJECT=`grep -nri $BAD_PRJECT ./.repo/manifests/* \
+		|grep xml \
+		|awk 'BEGIN{FS="<|>"}{print $2}'|awk 'BEGIN{FS="path="}{print $2}' \
+		|awk '{print $1}' `
+	GOOD_PROJECT=`echo $GOOD_PROJECT |awk '{print $1}'`
+	GOOD_PROJECT=`echo $GOOD_PROJECT|awk 'BEGIN{FS="\""}{print $2}'`
+
+	debug_print "Tried to fix project path from: $BAD_PRJECT to:  $GOOD_PROJECT"
+	PROJECT_DIR=$GOOD_PROJECT
 	debug_print "fix_dir_quirk exit $PROJECT_DIR"
-
 }
 
 get_patch_data()
 {
-	debug_print "get_patch_data enter"
+	debug_print " enter get_patch_data"
 	clean_vars;
 	PATCH_NUMBER=$1
 
@@ -150,6 +139,7 @@ get_patch_data()
 	LAST_TWO=`echo $PATCH_NUMBER| awk '{ print substr( $PATCH_NUMBER, length($PATCH_NUMBER) - 1, length($PATCH_NUMBER) ) }'`
 
 	#go to some git dir, to be able to talk to gerrit
+	cd $REPO_ROOT
 	cd build
 
 	ssh -p 29418 $SERVER gerrit query --current-patch-set $PATCH_NUMBER > t.txt
@@ -164,29 +154,34 @@ get_patch_data()
 				printf  $i "/"
 			}
 		}'`
+	PATCHSET=`ssh -p 29418 $SERVER gerrit query --current-patch-set 203 |grep -A 1 currentPatchSet|grep number|awk '{print $2}'`
 	CHANGEID=`cat t.txt|grep change|grep -v :|awk '{print $2}'`
 	SUBJECT=`cat t.txt|grep subject|awk 'BEGIN{FS="subject:"}{print $1 $2}'`
+	rm t.txt
 
-	fix_dir_quirk;
-
-	cd $REPO_ROOT	
-
+	cd $REPO_ROOT
 	is_dir_ok;
-	if [ $ISDIROK -eq 1 ]; then	
+	if [ $ISDIROK -eq 0 ]; then
+		fix_dir_quirk;
+	fi
+	#check if directory exists
+	is_dir_ok;
+	if [ $ISDIROK -eq 1 ]; then
+		#check if the change id is in the history
 		is_patch_present;
 	fi
 
-        debug_print "------------------------------"
-        debug_print "PATCH = $PATCH_NUMBER"
-        debug_print "PROJECT = $PROJECT"
-        debug_print "PATCHSET = $LATEST_PATCHSET"
-        debug_print "PROJECT DIR = $PROJECT_DIR"
-        debug_print "ISDIROK =  $ISDIROK"
-        debug_print "CHANGE ID = $CHANGEID"
-        debug_print "ISPRESENT = $ISPRESENT"
-        debug_print "------------------------------"
+	debug_print "------------------------------"
+	debug_print "PATCH = $PATCH_NUMBER"
+	debug_print "PROJECT = $PROJECT"
+	debug_print "PATCHSET = $LATEST_PATCHSET"
+	debug_print "PROJECT DIR = $PROJECT_DIR"
+	debug_print "ISDIROK =  $ISDIROK"
+	debug_print "CHANGE ID = $CHANGEID"
+	debug_print "ISPRESENT = $ISPRESENT"
+	debug_print "------------------------------"
 
-	debug_print "get_patch_data exit"
+	debug_print "exit get_patch_data"
 
 }
 
@@ -206,44 +201,47 @@ patchReport()
 
 apply_patch()
 {
+	debug_print "enter apply_patch ISPRESENT = $ISPRESENT ISDIROK = $ISDIROK"
+
+	cd $REPO_ROOT
+	if [ $ISDIROK -eq 0 ]; then
+		echo "Project dir $PROJECT_DIR does not exit for $PATCH_NUMBER, did not apply!"
+		return 1
+	fi
 	cd $PROJECT_DIR
 
-	debug_print "apply_patch ISPRESENT $ISPRESENT ISDIROK $ISDIROK"
-
-	if [ $ISPRESENT -eq 0 ]; then	
-		git fetch $GERRIT/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git cherry-pick FETCH_HEAD
+	if [ $ISPRESENT -eq 0 ]; then
+		git fetch $GERRIT/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git cherry-pick FETCH_HEAD 2>/dev/null
 		#check if apply worked.
-		git show>/dev/null>temp.txt
+		git show 2>/dev/null>temp.txt
 		ISPRESENT2=`cat temp.txt|grep $CHANGEID`
 		if [ -z "$ISPRESENT2" ]; then
 			echo "ERROR APPLING PATCH!!! $PATCH_NUMBER "
+			echo "Aborting.."
+			git am --abort;
 			exit 1;
 		fi
 
 	else
 		echo "PATCH $PATCH_NUMBER is present, not apply"
 	fi
-	
 
 	cd $REPO_ROOT
-}
-
-revert_patch()
-{
-	echo "REVERT NOT IMPLEMENTED YET."
 }
 
 patchReportShort()
 {
 	if [ $ISPRESENT -eq 1 ]; then
-		echo "$PATCH_NUMBER - IS PRESENT - $SUBJECT"
+		echo "$PATCH_NUMBER - IS PRESENT - $PROJECT_DIR - $SUBJECT"
 	else
-		echo "$PATCH_NUMBER - IS NOT PRESENT - $SUBJECT"
+		echo "$PATCH_NUMBER - IS NOT PRESENT - $PROJECT_DIR - $SUBJECT"
 	fi
 }
 
 clean_argument()
 {
+	debug_print "enter clean_argument $1"
+
 	ISDIRTY=`echo $1|egrep "android.intel.com|mcg-pri-gcr.jf.intel.com"`
 	if [ ! -z $ISDIRTY ]; then
 		#extract GERRIT number.
@@ -264,21 +262,33 @@ clean_argument()
 	else
 		CLEAN=$1
 	fi
-	debug_print "clean_argument $1 cleaned is:$CLEAN"
+
+	debug_print "exit clean_argument $1 cleaned is:$CLEAN"
 }
-
-
 
 get_patch()
 {
-	debug_print "cd $START_PATH/$PROJECT_DIR"
-	cd $REPO_ROOT/$PROJECT_DIR
+	debug_print "enter get_patch"
+
+	cd $REPO_ROOT
+	if [ $ISDIROK -eq 0 ]; then
+		echo "Project dir $PROJECT_DIR does not exit for $PATCH_NUMBER, did not apply!"
+		return 1
+	fi
+	cd $PROJECT_DIR
 
 	echo "Getting Patch ... $PATCH_NUMBER"
-	debug_print "get_patch git fetch $GERRIT/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch"
-	git fetch  $GERRIT/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch
-	cd $REPO_ROOT
-	
+	debug_print "get_patch git fetch $GERRIT:29418/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch"
+
+	git fetch  $GERRIT:29418/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD 2>&1>/dev/null > $START_PATH/$PATCH_NUMBER.patch
+
+	debug_print "exit get_patch"
+}
+show_patch()
+{
+	get_patch;
+	cat $START_PATH/$PATCH_NUMBER.patch
+	rm $START_PATH/$PATCH_NUMBER.patch
 }
 
 read_from_file()
@@ -286,12 +296,12 @@ read_from_file()
 	PATCHES=""
 	while read line
 	do
-		PATCHES+=" "$line	
+		PATCHES+=" "$line
 	done < $1
 	echo  $PATCHES
 
 	#run list of patches..
-	main $PATCHES		
+	main $PATCHES
 }
 
 set_user()
@@ -301,6 +311,22 @@ set_user()
 	echo "USER=$USER"
 }
 
+add_review()
+{
+	echo "add_review for $PATCH_NUMBER"
+
+	ssh -p 29418 $SERVER gerrit set-reviewers \
+	-a axelx.haslam@intel.com  \
+	-a aymen.zayet@intel.com \
+	-a christophe.fiat@intel.com \
+	-a frodex.isaksen@intel.com \
+	-a marcox.sinigaglia@intel.com \
+	-a jeremiex.garcia@intel.com \
+	-a nicolas.champciaux@intel.com \
+	-a pierrex.zurmely@intel.com \
+	-a jean.trivelly@intel.com \
+	$CHANGEID
+}
 
 usage()
 {
@@ -320,21 +346,27 @@ of the repo.
 	https://mcg-pri-gcr.jf.intel.com:8080/#/c/103/
 
 -options are:
-	-prv - print verbose patch info
-	-prs - print short patch info
+	-vv - print verbose patch info
+	-check - check if patch is present
 	-apply - try to apply patch
-	-revert - try to revert patch
+	-show - show the patch
+	-review - add reviewers
+	-reset - will revert all your local changes
+	-status - will show the local patches.
 	-brcm - patches are from brcm gerrit.
-	-gp - Get Patch - get .patch file
+	-get - Get Patch - get .patch file
 
 -example:
-	getPatch.sh 67871 https://mcg-pri-gcr.jf.intel.com:8080/#/c/103/ brcm 200
-	getPatch.sh 67871 67873 67874 70852
-	getPatch.sh http://android.intel.com:8080/#/c/70006/
+	1) Apply patches 67871 and 103
 
+		getPatch.sh 67871 https://mcg-pri-gcr.jf.intel.com:8080/#/c/103/
+
+	2)Apply patches 67871 67873 67874 70852 from android.intel.com
+	and 200 201 from cg-pri-gcr.jf.intel.com:
+
+		getPatch.sh -apply 67871 67873 67874 70852 -brcm 200 201
 
 "
-
 }
 
 
@@ -342,8 +374,7 @@ of the repo.
 # parced by main
 run_action()
 {
-
-	sanity;
+	cd $REPO_ROOT
 	clean_argument $1;
 	get_patch_data $CLEAN;
 
@@ -353,10 +384,98 @@ run_action()
 	0)patchReport;;
 	1)patchReportShort;;
 	2)apply_patch;;
-	3)revert_patch;;
 	4)get_patch;;
+	5)show_patch;;
+	6)add_review;;
 	*)echo "UNKNOWN MODE $MODE" ;;
 	esac
+}
+
+make_status() 
+{
+	cd $REPO_ROOT
+	repo forall -c "git status|egrep \"ahead|modified:|respectively.\";pwd;" |egrep -A 1 "ahead|modified|respectively." |grep home >  $REPO_ROOT/t.txt
+	filelines=`cat $REPO_ROOT/t.txt`
+	rm $REPO_ROOT/t.txt
+
+	for line in $filelines 
+	do
+		cd $line
+		STATUS=`git status |egrep ahead`
+		NUMPATCHES=`echo $STATUS|awk '{print $9}'`
+		if [ -z "$STATUS" ]; then
+			STATUS=`git status |grep respectively.`
+			NUMPATCHES=`echo $STATUS|awk '{print $4}'`
+		fi
+
+		UNCOMMITED=`git status |grep modified:|awk '{print $1}'`
+		echo " $line  $NUMPATCHES local patch(es)"
+		if [ ! -z "$UNCOMMITED" ]; then
+			UNCOMMITED="YES"
+		else
+			 UNCOMMITED="NO"
+		fi
+		echo "$line $NUMPATCHES $UNCOMMITED"  >> $REPO_ROOT/t.txt
+	done
+}
+
+repo_reset()
+{
+	cd $REPO_ROOT
+	repo forall -c "git status|grep ahead;pwd" |grep -A 1 ahead|grep home > ./t.txt
+	while read line
+	do
+		cd $line
+		
+		STATUS=`git status |grep ahead`
+		NUMPATCHES=`echo $STATUS|awk '{print $9}'`
+		echo  $line reseting...  $NUMPATCHES patches
+		git reset --hard HEAD~$NUMPATCHES
+			
+	done <./t.txt
+	cd $REPO_ROOT
+	rm -rf t.txt
+}
+repo_status()
+{
+	cd $REPO_ROOT
+	repo forall -c "git status|egrep \"ahead|modified:|respectively.\";pwd;" |egrep -A 1 "ahead|modified|respectively." |grep home >  $REPO_ROOT/t.txt
+	filelines=`cat $REPO_ROOT/t.txt`
+	rm t.txt
+
+	for line in $filelines 
+	do
+		cd $line
+		STATUS=`git status |grep ahead`
+		NUMPATCHES=`echo $STATUS|awk '{print $9}'`
+		if [ -z "$STATUS" ]; then
+			STATUS=`git status |grep respectively.`
+			NUMPATCHES=`echo $STATUS|awk '{print $4}'`
+		fi
+		UNCOMMITED=`git status |grep modified:|awk '{print $1}'`
+		echo " $line  $NUMPATCHES local patch(es)"
+		if [ ! -z "$UNCOMMITED" ]; then
+			echo "UNCOMMITED CHANGES!"
+		fi
+	
+		for (( c=$(($NUMPATCHES - 1)); c>=0; c-- ))
+		do
+			CHANGEID=`git show HEAD~$c|grep Change-Id|awk '{print $2}'`
+			ssh -p 29418 android.intel.com gerrit query --current-patch-set  $CHANGEID >$REPO_ROOT/t.txt
+			NUMBER=`cat $REPO_ROOT/t.txt|grep number -m 1|awk '{print $2}'`
+			SUBJECT=`cat $REPO_ROOT/t.txt|grep subject|awk 'BEGIN{FS="subject:"}{print $1 $2}'`
+
+			rm $REPO_ROOT/t.txt
+			if [ -z $NUMBER ]; then
+				NUMBER="not in gerrit"
+			fi	
+
+			echo "$CHANGEID  IN_GERRIT=$NUMBER $SUBJECT"
+			done
+		echo ""
+		cd $REPO_ROOT	
+	done
+
 }
 
 #main state machine
@@ -364,26 +483,29 @@ main ()
 {
 	while [ ! -z "$1" ]; do
 		debug_print "main $1"
-	        case $1 in
-	       	-prv)     MODE=0;;
-		-prs)	MODE=1;;
-		-apply)	MODE=2;;
-		-revert) MODE=3;;
-		-brcm) set_brcm;;
-		-gp) MODE=4;;
-		-f) read_from_file $2;exit;;
-		-DEBUG) DEBUG=1;;
-		-user) set_user $2; shift;;
-		-help) usage;exit;;
-		-help)	usage;exit;;
-		--help) usage;exit;;
+		case $1 in
+		-vv)		MODE=0;;
+		-check)		MODE=1;;
+		-apply)		MODE=2;;
+		-get)		MODE=4;;
+		-show)		MODE=5;;
+		-review)	MODE=6;;
+		-reset)		repo_reset;;
+		-status)	repo_status;;
+		-brcm)		set_brcm;;
+		-f)		read_from_file $2;exit;;
+		-DEBUG)		DEBUG=1;;
+		-user)		set_user $2; shift;;
+		-help)		usage;exit;;
+		--help)		usage;exit;;
 		*) run_action $1;;
         	esac
         	shift
 	done
 }
 
+if [ -z "$1"  ]; then
+	usage;exit 1;
+fi
+sanity;
 main "$@";
-
-
-

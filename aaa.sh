@@ -10,8 +10,8 @@ MANIFEST_FILE=manifest-generated.xml
 #PROJECT_DIR=/home/axelh/GITS/R3STABLE
 #PROJECT_DIR=/home/axelh/GITS/INTEL_BRCM
 #PROJECT_DIR=/home/axelh/GITS/BRCM
-#PROJECT_DIR=/home/axelh/GITS/MAIN3
-PROJECT_DIR=/home/axelh/GITS/BRCM_MAIN
+PROJECT_DIR=/home/axelh/GITS/MAIN
+#PROJECT_DIR=/home/axelh/GITS/BRCM_MAIN
 
 #PLATFORM=mfld_pr2
 PLATFORM=mfld_pr2
@@ -26,7 +26,7 @@ BRANCH=main
 
 #BUILD_TYPE=userdebug
 #BUILD_TYPE=eng
-BUILD_TYPE=mfld_pr2_bcm-eng
+BUILD_TYPE=mfld_pr2_bcm
 
 
 #BRCM_MODULE=$PROJECT_DIR/hardware/broadcom/PRIVATE/wlan/bcm4335/open-src/src/dhd/linux/dhd-cdc-sdmmc-android-intel-icsmr1-cfg80211-oob-3.0.34/bcmdhd.ko
@@ -120,7 +120,6 @@ sync_new_project()
 	print "REPO SYNC"
 	repo sync
 
-	repo init -u git://android.intel.com/manifest -b /platform/android/main -m broadcom
 
 	#Check that sync worked and try again if not.
 	if [ ! -e $PROJECT_DIR/frameworks ]; then
@@ -131,7 +130,7 @@ sync_new_project()
 
 	print "BUILDING SYSTEM"
 	source build/envsetup.sh
-	lunch $BUILD_TYPE
+	lunch $BUILD_TYPE-eng
 	make -j8 $BUILD_TYPE
 	make -j8 flashfiles
 	make -j8 blank_flashfiles	
@@ -315,8 +314,8 @@ make_flash_files()
 {
 	cd $PROJECT_DIR
 	source build/envsetup.sh
-	lunch $PLATFORM-$BUILD_TYPE
-	make -j8 $PLATFORM 
+	lunch $BUILD_TYPE-eng
+	make -j8 $BUILD_TYPE 
 	make -j8 flashfiles
 	make -j8 blank_flashfiles
 }

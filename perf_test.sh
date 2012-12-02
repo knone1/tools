@@ -1,6 +1,6 @@
 TEST_TIME=25
-DUT_IP=192.168.1.100
-PC_IP=192.168.1.24
+DUT_IP=192.168.2.6
+PC_IP=192.168.2.24
 DIR=$PWD
 adb push ~/tools/iperf-static /data
 
@@ -199,7 +199,7 @@ case $1 in
 	-udp_up)
 		pc_udp_up
 		sleep 1;
-		dut_udp_up;
+		dut_udp_up2;
 		usb_off;
 		sleep $TEST_TIME;
 		usb_on;
@@ -215,7 +215,7 @@ case $1 in
 		adb shell input keyevent 26;
 		;;
 	-udp_down)
-		dut_udp_down;
+		dut_udp_down2;
 		sleep 3;
 		pc_udp_down
 		usb_off;
@@ -228,7 +228,7 @@ case $1 in
 	-tcp_up)
 		pc_tcp_up
 		sleep 1;
-		dut_tcp_up;
+		dut_tcp_up2;
 		usb_off;
 		sleep $TEST_TIME;
 		usb_on;
@@ -239,7 +239,7 @@ case $1 in
 		adb shell input keyevent 26;
 		;;
 	-tcp_down)
-		dut_tcp_down;
+		dut_tcp_down2;
 		sleep 3;
 		pc_tcp_down;
 		usb_off;
