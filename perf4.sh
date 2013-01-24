@@ -3,7 +3,7 @@
 #    SETTINGS
 ####################
 DUT_IP=192.168.1.102
-PC_IP=192.168.1.24
+PC_IP=192.168.2.24
 ANDROID_IPERF=~/tools/iperf-static
 
 
@@ -13,8 +13,8 @@ ANDROID_IPERF=~/tools/iperf-static
 DIR=$PWD
 TEST="NONE"
 W=64k
-PT=30
-TEST_TIME=35
+PT=10
+TEST_TIME=15
 M=200
 
 usage()
@@ -50,22 +50,22 @@ print()
         echo "#######################################################"
 }
 
-dut_udp_down()
+dut_udp_down_s()
 {
-	echo  "dut_udp_down /data/iperf-static -s -u"
+	echo  "dut_udp_down /data/iperf-static -s -u -i 1"
 	adb shell "/data/iperf-static -s -u > /data/iperf_server.txt" &
 }
 
-pc_udp_down()
+pc_udp_down_c()
 {
 	echo "pc_udp_down iperf -u -c $DUT_IP -b $M"M" -t $PT -i 1"
-	iperf -u -c $DUT_IP -b $M"M" -t $PT -i 1 > $DIR/iperf_client.txt &
+	iperf -u -c $DUT_IP -b $M"M" -t $PT -i 1 > $DIR/iperf_client.txt
 }
 
-dut_udp_up()
+dut_udp_up_c()
 {
 	echo "dut_udp_up /data/iperf-static -u -c $PC_IP -b $M"M" -t $PT"
-	adb shell "/data/iperf-static -u -c $PC_IP -b $M"M" -t $PT > /data/iperf_client.txt" &
+	adb shell "/data/iperf-static -u -c $PC_IP -b $M"M" -t $PT > /data/iperf_client.txt"
 }
 
 dut_tcp_up()
@@ -81,9 +81,9 @@ dut_tcp_down()
 }
 
 
-pc_udp_up()
+pc_udp_up_s()
 {
-	echo "pc_udp_up iperf -s -u"
+	echo "pc_udp_up iperf -s -u -i 1"
 	iperf -s -u > $DIR/iperf_server.txt &
 }
 
@@ -130,22 +130,18 @@ run()
 	-udp_up)
 		TEST="UDP_UP"
 		print $TEST
-		pc_udp_up
+		pc_udp_up_s
 		sleep 3;
-		dut_udp_up;
-		echo "sleep for $TEST_TIME"
-		sleep $TEST_TIME;
+		dut_udp_up_c;
 		clean;
 		;;
 
 	-udp_down)
 		TEST="UDP_DOWN"
 		print $TEST
-		dut_udp_down;
+		dut_udp_down_s;
 		sleep 3;
-		pc_udp_down
-		echo "sleep for $TEST_TIME"
-		sleep $TEST_TIME;	
+		pc_udp_down_c;
 		clean;
 		;;
 	-tcp_up)
@@ -173,6 +169,51 @@ run()
 		;;
 
 	esac
+}
+
+insmod_4c()
+{
+
+echo "insmod 2g"
+adb shell "rmmod bcmdhd"
+sleep 2
+adb shell "insmod /lib/modules/bcmdhd_4334.ko firmware_path=/system/etc/firmware/fw_bcmdhd_4334.bin nvram_path=/data/bcmdhd_new_4c.cal"
+sleep 2
+adb shell "ifconfig wlan0 up 192.168.2.15"
+sleep 2
+echo "insmod done."
+
+}
+
+insmod_30()
+{
+
+echo "insmod 2g"
+adb shell "rmmod bcmdhd"
+sleep 2
+adb shell "insmod /lib/modules/bcmdhd_4334.ko firmware_path=/system/etc/firmware/fw_bcmdhd_4334.bin nvram_path=/data/bcmdhd_new_30.cal"
+#adb shell "insmod /lib/modules/bcmdhd_4335.ko firmware_path=/system/etc/firmware/fw_bcmdhd_4335.bin nvram_path=/system/etc/wifi/bcmdhd_4335.cal"
+
+sleep 2
+adb shell "ifconfig wlan0 up 192.168.2.15"
+sleep 2
+echo "insmod done."
+
+}
+
+join_2G()
+{
+	adb shell "/data/wlx join axel_2G_20"
+	sleep 5;
+}
+
+join_5G()
+{
+	adb shell "/data/wlx disassoc"
+	sleep 2;
+	adb shell "/data/wlx join axel_5G_40"
+	sleep 5;
+	
 }
 
 setup()
@@ -223,13 +264,19 @@ setup()
 	fi
 
 	echo "Pinging $DUT_IP"
+	FLAG="";
+
+	while [ -z "$FLAG" ]; do
+
 	ISPINGOK=`ping -c 1 $DUT_IP |grep time=`
 	if [ -n "$ISPINGOK" ];then
 		echo "Ping... OK"
+		FLAG=1
 	else
 		echo "Ping... FAIL"
-		exit
 	fi
+
+	done
 
 	echo "push iperf..."
 	adb push $ANDROID_IPERF /data 2>/dev/null
@@ -238,6 +285,11 @@ setup()
 	rm  $DIR/iperf_* 2>/dev/null
 	adb shell "rm /data/iperf_*" 2>/dev/null
 
+	echo "getting RSSI"
+	adb shell "/data/wlx status >/data/status.txt"
+	adb pull /data/status.txt $DIR  2>/dev/null
+	RSSI=`cat $DIR/status.txt|grep RSSI|awk '{print $4}'`
+	echo "RSSI=$RSSI"
 
 	echo setting perf to max
 	adb shell "echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
@@ -245,6 +297,7 @@ setup()
 	adb shell "/data/wlx PM 0"
 	adb shell "/data/wlx scansuppress 1"
 	adb shell "/data/wlx country XY"
+	
 	echo "Setup OK!"
 	echo ""	
 }
@@ -258,25 +311,51 @@ if [ -z "$1" ]; then
         exit
 fi
 
+
+test_R(){
 setup;
 case $1 in
 	-all)
 		run -udp_up
 		run -udp_down
-		run -tcp_up
-		run -tcp_down
+#		run -tcp_up
+#		run -tcp_down
 		print "TEST DONE"
 		cat $DIR/iperf_result.txt
 		;;
 	*)
 		run $1
 esac
+}
+
+insmod_4c;
+join_2G;
+test_R $1;
+RES2G4C=`cat $DIR/iperf_result.txt`
+
+insmod_4c;
+join_5G;
+test_R $1;
+RES5G4C=`cat $DIR/iperf_result.txt`
+
+insmod_30;
+join_2G;
+test_R $1;
+RES2G30=`cat $DIR/iperf_result.txt`
+
+insmod_30;
+join_5G;
+test_R $1;
+RES5G30=`cat $DIR/iperf_result.txt`
 
 
-
-
-
-
-
+echo "RES2G4C"
+echo "$RES2G4C"
+echo "RES5G4C"
+echo "$RES5G4C"
+echo "RES2G30"
+echo "$RES2G30"
+echo "RES5G30"
+echo "$RES5G30"
 
 

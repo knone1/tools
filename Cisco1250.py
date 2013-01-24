@@ -688,7 +688,7 @@ class Cisco1250():
         if int(bandwidth) == 20:
             cmd = "channel width 20"
         elif int(bandwidth) == 40:
-            cmd = "channel width 40-below"
+            cmd = "channel width 40-Above"
         else:
             raise Exception(-5,
                 "Unsupported wifi bandwidth '%s'." % str(bandwidth))
@@ -905,9 +905,8 @@ class Cisco1250():
 
             # set_wifi_standard restarts the needed radios
             self.set_wifi_standard(standard_type)
-	    self._send_cmd("end") # exit configure
         finally:
-            self._send_cmd("copy running-config startup-config") # exit configure
+		self._send_cmd("end") # exit configure
         
         # Wait for configuration time end
         time.sleep(configuration_timer)

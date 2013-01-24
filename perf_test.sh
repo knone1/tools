@@ -1,6 +1,6 @@
 TEST_TIME=25
-DUT_IP=192.168.2.6
-PC_IP=192.168.2.24
+DUT_IP=192.168.1.9
+PC_IP=192.168.1.24
 DIR=$PWD
 adb push ~/tools/iperf-static /data
 

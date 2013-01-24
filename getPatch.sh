@@ -21,7 +21,7 @@ DEBUG=0
 #CONSTANTS
 START_PATH=$PWD
 
-GERRIT="git://android.intel.com"
+GERRIT="ssh://ahaslamx@android.intel.com"
 SERVER="android.intel.com"
 USER=ahaslamx
 
@@ -51,17 +51,18 @@ set_brcm()
 set_intel()
 {
 	ISBRCM=0
-	GERRIT=git://android.intel.com
+	GERRIT=ssh://$USER@android.intel.com
 	SERVER=android.intel.com
 }
 
 is_patch_present()
 {
 	cd $PROJECT_DIR
+
+	#look for change id in last 100 commits..
 	git log HEAD~100..HEAD 2>/dev/null>temp.txt
 
 	#git log may be too small
-
 	HASDATA=`cat temp.txt`
 	debug_print "HASDATA" $HASDATA
 	if [ -z "$HASDATA" ]; then
@@ -70,7 +71,6 @@ is_patch_present()
 
 	#find the change if on the git log.
 	ISPRESENT=`cat temp.txt|grep $CHANGEID`
-
 	rm temp.txt
 
 	if [ -z "$ISPRESENT" ]; then
@@ -109,24 +109,15 @@ clean_vars()
 	PATCHSET=0
 }
 
-#some projects patch are not the same as project git.
-fix_dir_quirk()
-{
-	debug_print "fix_dir_quirk enter $PROJECT_DIR"
-
-	BAD_PRJECT=`echo $PROJECT_DIR|head -c -2`
-	#search manifest to find project path.
-	#GOOD_PRJECT=`find ./.repo/manifests/ -name "*.xml" -print0 | xargs -0 cat -n "$2" 2>/dev/null|grep -m1 "$BAD_PRJECT"|awk 'BEGIN{FS="path"}{print $2}'|cut -b 2-|awk 'BEGIN{FS="name|,|\""}{print $1}'`
-	GOOD_PROJECT=`grep -nri $BAD_PRJECT ./.repo/manifests/* \
-		|grep xml \
-		|awk 'BEGIN{FS="<|>"}{print $2}'|awk 'BEGIN{FS="path="}{print $2}' \
-		|awk '{print $1}' `
-	GOOD_PROJECT=`echo $GOOD_PROJECT |awk '{print $1}'`
-	GOOD_PROJECT=`echo $GOOD_PROJECT|awk 'BEGIN{FS="\""}{print $2}'`
-
-	debug_print "Tried to fix project path from: $BAD_PRJECT to:  $GOOD_PROJECT"
-	PROJECT_DIR=$GOOD_PROJECT
-	debug_print "fix_dir_quirk exit $PROJECT_DIR"
+get_project_dir() {
+	cd $REPO_ROOT
+	debug_print $PROJECT
+	if [ ! -e .getPatchIndex.txt ]; then
+		echo "generating project index file"
+		repo forall -c "cat ./.git/config|grep projectname;pwd" > .getPatchIndex.txt
+	fi
+	PROJECT_DIR=`cat .getPatchIndex.txt |grep -A 1 $PROJECT|tail -1`
+	debug_print $PROJECT_DIR
 }
 
 get_patch_data()
@@ -134,36 +125,28 @@ get_patch_data()
 	debug_print " enter get_patch_data"
 	clean_vars;
 	PATCH_NUMBER=$1
-
+	PATCH_INPUT=$1
 	#get the last two digits
 	LAST_TWO=`echo $PATCH_NUMBER| awk '{ print substr( $PATCH_NUMBER, length($PATCH_NUMBER) - 1, length($PATCH_NUMBER) ) }'`
 
-	#go to some git dir, to be able to talk to gerrit
 	cd $REPO_ROOT
-	cd build
 
 	ssh -p 29418 $SERVER gerrit query --current-patch-set $PATCH_NUMBER > t.txt
-	
+
 	#parse the info
 	PATCH_INFO=`cat t.txt`
 	LATEST_PATCHSET=`cat t.txt |grep number|tail -1|awk '{print $2}'`
 	PROJECT=`cat t.txt|grep project |tail -1|awk '{print $2}'`
 	RAWDATA=`cat t.txt`
-	PROJECT_DIR=`echo $PROJECT|awk 'BEGIN{FS="/"}{
-			for (i=3;i<=NF;i++){
-				printf  $i "/"
-			}
-		}'`
-	PATCHSET=`ssh -p 29418 $SERVER gerrit query --current-patch-set 203 |grep -A 1 currentPatchSet|grep number|awk '{print $2}'`
+#	PATCHSET=`ssh -p 29418 $SERVER gerrit query --current-patch-set 203 |grep -A 1 currentPatchSet|grep number|awk '{print $2}'`
 	CHANGEID=`cat t.txt|grep change|grep -v :|awk '{print $2}'`
 	SUBJECT=`cat t.txt|grep subject|awk 'BEGIN{FS="subject:"}{print $1 $2}'`
+	PATCH_NUMBER=`cat t.txt|grep number:|head -1|awk '{print $2}'`
 	rm t.txt
 
-	cd $REPO_ROOT
-	is_dir_ok;
-	if [ $ISDIROK -eq 0 ]; then
-		fix_dir_quirk;
-	fi
+	#find the project
+	get_project_dir;	
+
 	#check if directory exists
 	is_dir_ok;
 	if [ $ISDIROK -eq 1 ]; then
@@ -180,7 +163,6 @@ get_patch_data()
 	debug_print "CHANGE ID = $CHANGEID"
 	debug_print "ISPRESENT = $ISPRESENT"
 	debug_print "------------------------------"
-
 	debug_print "exit get_patch_data"
 
 }
@@ -269,7 +251,6 @@ clean_argument()
 get_patch()
 {
 	debug_print "enter get_patch"
-
 	cd $REPO_ROOT
 	if [ $ISDIROK -eq 0 ]; then
 		echo "Project dir $PROJECT_DIR does not exit for $PATCH_NUMBER, did not apply!"
@@ -280,7 +261,7 @@ get_patch()
 	echo "Getting Patch ... $PATCH_NUMBER"
 	debug_print "get_patch git fetch $GERRIT:29418/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD > $START_PATH/$PATCH_NUMBER.patch"
 
-	git fetch  $GERRIT:29418/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD 2>&1>/dev/null > $START_PATH/$PATCH_NUMBER.patch
+	git fetch  git://$SERVER/$PROJECT refs/changes/$LAST_TWO/$PATCH_NUMBER/$LATEST_PATCHSET && git format-patch -1 --stdout FETCH_HEAD 2>&1>/dev/null > $START_PATH/$PATCH_NUMBER.patch
 
 	debug_print "exit get_patch"
 }
@@ -306,14 +287,13 @@ read_from_file()
 
 set_user()
 {
-	echo "USER=$USER"
 	USER=$1
-	echo "USER=$USER"
+	echo "Set to USER=$USER"
 }
 
 add_review()
 {
-	echo "add_review for $PATCH_NUMBER"
+	echo "add_review for $PATCH_INPUT"
 
 	ssh -p 29418 $SERVER gerrit set-reviewers \
 	-a axelx.haslam@intel.com  \
@@ -321,11 +301,13 @@ add_review()
 	-a christophe.fiat@intel.com \
 	-a frodex.isaksen@intel.com \
 	-a marcox.sinigaglia@intel.com \
+	-a julie.regairaz@intel.com \
+	-a quentinx.casasnovas@intel.com \
 	-a jeremiex.garcia@intel.com \
 	-a nicolas.champciaux@intel.com \
 	-a pierrex.zurmely@intel.com \
 	-a jean.trivelly@intel.com \
-	$CHANGEID
+	$PATCH_INPUT
 }
 
 usage()
@@ -366,6 +348,58 @@ of the repo.
 
 		getPatch.sh -apply 67871 67873 67874 70852 -brcm 200 201
 
+Options Details:
+
+-vv -  verbose print
+	getPatch.sh -vv 78411
+	*********************************
+	PATCH = 78411
+	PROJECT = a/bsp/hardware/intel/linux-2.6
+	PATCHSET = 5
+	PROJECT DIR = /home/axelh/GITS/MAIN2/hardware/intel/linux-2.6
+	ISDIROK =  1
+	CHANGE ID = I3327cb268853307d85eb62e4e7caf58a06891a33
+	ISPRESENT = 1
+	*********************************
+
+-check - check if patch is present
+	getPatch.sh -check 78411
+	78411 - IS PRESENT - /home/axelh/GITS/MAIN2/hardware/intel/linux-2.6 -    fix for mmc caps and rescan
+
+-apply - apply patches from latst patchset (skip if present)
+	getPatch.sh -apply 78411
+	From ssh://android.intel.com/a/bsp/hardware/intel/linux-2.6
+ 	* branch            refs/changes/11/78411/5 -> FETCH_HEAD
+	[main 9935ffe] fix for mmc caps and rescan
+ 	2 files changed, 6 insertions(+), 4 deletions(-)
+
+-show - show the patch
+	getPatch.sh -show 78411
+	Getting Patch ... 78411
+	From ssh://android.intel.com:29418/a/bsp/hardware/intel/linux-2.6
+	 * branch            refs/changes/11/78411/5 -> FETCH_HEAD
+	From f11c79158490b3e3b9f48fa38241ac3c79179c58 Mon Sep 17 00:00:00 2001
+	From: Axel Haslam <axelx.haslam@intel.com>
+	Date: Mon, 3 Dec 2012 15:15:27 +0100
+	Subject: [PATCH] fix for mmc caps and rescan
+
+	Change-Id: I3327cb268853307d85eb62e4e7caf58a06891a33
+	Signed-off-by: Axel Haslam <axelx.haslam@intel.com>
+	---
+	 .../intel-mid/device_libs/platform_mmc_sdhci_pci.c |    4 ++--
+	 drivers/mmc/host/sdhci-pci.c                       |    6 ++++--
+	 2 files changed, 6 insertions(+), 4 deletions(-)
+
+	[...
+
+-review - add reviewers
+	reviewers are harcoded on the script. WIP
+
+-reset - will reset all local repo changes
+
+-status - will show you your local patches
+	
+
 "
 }
 
@@ -391,7 +425,9 @@ run_action()
 	esac
 }
 
-make_status() 
+
+#create CSV file of pro
+get_changed_projects() 
 {
 	cd $REPO_ROOT
 	repo forall -c "git status|egrep \"ahead|modified:|respectively.\";pwd;" |egrep -A 1 "ahead|modified|respectively." |grep home >  $REPO_ROOT/t.txt
@@ -409,68 +445,72 @@ make_status()
 		fi
 
 		UNCOMMITED=`git status |grep modified:|awk '{print $1}'`
-		echo " $line  $NUMPATCHES local patch(es)"
 		if [ ! -z "$UNCOMMITED" ]; then
 			UNCOMMITED="YES"
 		else
 			 UNCOMMITED="NO"
 		fi
-		echo "$line $NUMPATCHES $UNCOMMITED"  >> $REPO_ROOT/t.txt
+		echo "$line,$NUMPATCHES,$UNCOMMITED"  >> $REPO_ROOT/t.txt
 	done
 }
 
 repo_reset()
 {
 	cd $REPO_ROOT
-	repo forall -c "git status|grep ahead;pwd" |grep -A 1 ahead|grep home > ./t.txt
-	while read line
+
+	make_status
+	filelines=`cat $REPO_ROOT/t.txt`
+	for line in $filelines 
 	do
-		cd $line
-		
-		STATUS=`git status |grep ahead`
-		NUMPATCHES=`echo $STATUS|awk '{print $9}'`
-		echo  $line reseting...  $NUMPATCHES patches
+		PROJECTDIR=`echo $line|awk 'BEGIN{FS=","}{print $1}'`
+		NUMPATCHES=`echo $line|awk 'BEGIN{FS=","}{print $2}'`
+		UNCOMMITED=`echo $line|awk 'BEGIN{FS=","}{print $3}'`
+		echo "RESETING: $PROJECTDIR $NUMPATCHES local patch(es) +UNCOMMITED=$UNCOMMITED"
+		cd $PROJECTDIR
 		git reset --hard HEAD~$NUMPATCHES
-			
-	done <./t.txt
-	cd $REPO_ROOT
-	rm -rf t.txt
+
+	done
+
+
 }
 repo_status()
 {
 	cd $REPO_ROOT
-	repo forall -c "git status|egrep \"ahead|modified:|respectively.\";pwd;" |egrep -A 1 "ahead|modified|respectively." |grep home >  $REPO_ROOT/t.txt
-	filelines=`cat $REPO_ROOT/t.txt`
-	rm t.txt
 
+	get_changed_projects
+	filelines=`cat $REPO_ROOT/t.txt`
 	for line in $filelines 
 	do
-		cd $line
-		STATUS=`git status |grep ahead`
-		NUMPATCHES=`echo $STATUS|awk '{print $9}'`
-		if [ -z "$STATUS" ]; then
-			STATUS=`git status |grep respectively.`
-			NUMPATCHES=`echo $STATUS|awk '{print $4}'`
-		fi
-		UNCOMMITED=`git status |grep modified:|awk '{print $1}'`
-		echo " $line  $NUMPATCHES local patch(es)"
-		if [ ! -z "$UNCOMMITED" ]; then
-			echo "UNCOMMITED CHANGES!"
-		fi
-	
+		PROJECTDIR=`echo $line|awk 'BEGIN{FS=","}{print $1}'`
+		NUMPATCHES=`echo $line|awk 'BEGIN{FS=","}{print $2}'`
+		UNCOMMITED=`echo $line|awk 'BEGIN{FS=","}{print $3}'`
+		echo "$PROJECTDIR $NUMPATCHES local patch(es) +UNCOMMITED=$UNCOMMITED"
+
+		cd $PROJECTDIR
 		for (( c=$(($NUMPATCHES - 1)); c>=0; c-- ))
 		do
+			CPROJ=`cat ./.git/config  |grep projectname|awk '{print $3}'`
 			CHANGEID=`git show HEAD~$c|grep Change-Id|awk '{print $2}'`
-			ssh -p 29418 android.intel.com gerrit query --current-patch-set  $CHANGEID >$REPO_ROOT/t.txt
-			NUMBER=`cat $REPO_ROOT/t.txt|grep number -m 1|awk '{print $2}'`
-			SUBJECT=`cat $REPO_ROOT/t.txt|grep subject|awk 'BEGIN{FS="subject:"}{print $1 $2}'`
+			SUBJECT_LOCAL=`git show HEAD~$c|grep Date -A 2|tail -1`
+			if [ ! -z $CHANGEID ]; then
+				ssh -p 29418 android.intel.com gerrit query --current-patch-set  $CHANGEID |grep -A 5 $CPROJ>$REPO_ROOT/p.txt
 
-			rm $REPO_ROOT/t.txt
-			if [ -z $NUMBER ]; then
-				NUMBER="not in gerrit"
-			fi	
+				NUMBER=`cat $REPO_ROOT/p.txt|grep number -m 1|awk '{print $2}'`
+				SUBJECT=`cat $REPO_ROOT/p.txt|grep subject|head -1|awk 'BEGIN{FS="subject:"}{print $1 $2}'`
+			
+				rm $REPO_ROOT/p.txt
+			
+				if [ -z $NUMBER ]; then
+					LINK="not in gerrit"
+					SUBJECT=$SUBJECT_LOCAL
+				else
+					LINK="http://android.intel.com:8080/#/c/$NUMBER/"
+				fi	
 
-			echo "$CHANGEID  IN_GERRIT=$NUMBER $SUBJECT"
+				echo "$LINK  $SUBJECT"
+			else
+				echo "Patch with no Change-id"
+			fi
 			done
 		echo ""
 		cd $REPO_ROOT	
