@@ -477,7 +477,7 @@ update()
 	WHERE=`which getPatch.sh`
 	cp $WHERE $WHERE.bkp
 	rm $WHERE
-	https://raw.github.com/axelhaslam/tools/master/getPatch.sh
+	wget https://raw.github.com/axelhaslam/tools/master/getPatch.sh
 	mv ./getPatch.sh $WHERE
 	chmod 777 $WHERE
 
