@@ -16,6 +16,7 @@ W=64k
 PT=10
 TEST_TIME=15
 M=200
+IPERF_A="/data/data/com.magicandroidapps.iperf/bin/iperf"
 
 usage()
 {
@@ -53,7 +54,7 @@ print()
 dut_udp_down_s()
 {
 	echo  "dut_udp_down /data/iperf-static -s -u -i 1"
-	adb shell "/data/iperf-static -s -u > /data/iperf_server.txt" &
+	adb shell "$IPERF_A -s -u > /data/iperf_server.txt" &
 }
 
 pc_udp_down_c()
@@ -65,19 +66,19 @@ pc_udp_down_c()
 dut_udp_up_c()
 {
 	echo "dut_udp_up /data/iperf-static -u -c $PC_IP -b $M"M" -t $PT"
-	adb shell "/data/iperf-static -u -c $PC_IP -b $M"M" -t $PT > /data/iperf_client.txt"
+	adb shell "$IPERF_A -u -c $PC_IP -b $M"M" -t $PT > /data/iperf_client.txt"
 }
 
 dut_tcp_up()
 {
 	echo "dut_tcp_up /data/iperf-static -c $PC_IP -t $PT -i 1 -w $W"
-	adb shell "/data/iperf-static -c $PC_IP -t $PT -i 1 -w $W > /data/iperf_client.txt" &
+	adb shell "$IPERF_A -c $PC_IP -t $PT -i 1 -w $W > /data/iperf_client.txt" &
 }
 
 dut_tcp_down()
 {
 	echo "dut_tcp_down /data/iperf-static -s"
-	adb shell "/data/iperf-static -s > /data/iperf_server.txt" &
+	adb shell "$IPERF_A -s > /data/iperf_server.txt" &
 }
 
 
