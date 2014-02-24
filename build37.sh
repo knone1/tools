@@ -1,5 +1,10 @@
-WRL_ENTRYNAV=/bmw117/D14024A/layers
+#!/bin/sh
+
+
+#WRL_ENTRYNAV=/bmw117/C13414A/layers
+WRL_ENTRYNAV=/bmw117/C13374A/layers
 WRL_MMBP=/MM_BASE/arm/layers
+
 
 /MM_BASE/wrlinux/wrlinux-3.0/wrlinux/configure \
 --enable-board=mm_entrynavc2hw \
@@ -11,16 +16,15 @@ $WRL_ENTRYNAV/delta_swinteg,\
 $WRL_ENTRYNAV/announcementmanager,\
 $WRL_ENTRYNAV/audioconnect,\
 $WRL_ENTRYNAV/audioroutingmanager,\
-$WRL_ENTRYNAV/bmw-hmi-2,\
+$WRL_ENTRYNAV/bmw-hmi,\
 $WRL_ENTRYNAV/boot-conf,\
-/home/mmes/GITS/cddrv,\
+$WRL_ENTRYNAV/cddrv,\
 $WRL_ENTRYNAV/cd-eject-server,\
 $WRL_ENTRYNAV/cdserver,\
-$WRL_ENTRYNAV/ceconn,\
+/home/mmes/GITS/ceconn,\
 $WRL_ENTRYNAV/cleanup-service,\
 $WRL_ENTRYNAV/codingapp,\
 $WRL_ENTRYNAV/connectivity,\
-$WRL_ENTRYNAV/data-shredder,\
 $WRL_ENTRYNAV/displayselect,\
 $WRL_ENTRYNAV/dlt,\
 $WRL_ENTRYNAV/dlt-config,\
@@ -37,7 +41,6 @@ $WRL_ENTRYNAV/iap,\
 $WRL_ENTRYNAV/imc,\
 $WRL_ENTRYNAV/ivi-layer-management,\
 $WRL_ENTRYNAV/kisu,\
-$WRL_ENTRYNAV/ldm,\
 $WRL_ENTRYNAV/lifecycle,\
 $WRL_ENTRYNAV/linux-3.1.10,\
 $WRL_ENTRYNAV/logging-screenshot,\
@@ -88,4 +91,6 @@ lttng,\
 delta,\
 fis_db_development \
 --enable-rpmdatabase=no
+
+
 

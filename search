@@ -2,6 +2,9 @@ find "$1" -type f -name "*.[chxsS]" -print0 | xargs -0 grep -F -n  "$2" |awk 'BE
 #find "$1" -type f -name "*.java" -print0 | xargs -0 grep -F -n  "$2"
 #find "$1" -type f -name "*.patch" -print0 | xargs -0 grep -F -n  "$2"
 find "$1" -type f -name "*.cpp" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
+
+find "$1" -type f -name "Makefile" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
+
 #find "$1" -type f -name "*config" -print0 | xargs -0 grep -F -n  "$2"
 #find "$1" -type f -name "*.txt" -print0 | xargs -0 grep -F -n  "$2"
 #find "$1" -type f -name "*.mk" -print0 | xargs -0 grep -F -n  "$2"
