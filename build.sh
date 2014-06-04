@@ -16,7 +16,7 @@ $WRL_ENTRYNAV/boot-conf,\
 /home/mmes/GITS/cddrv,\
 $WRL_ENTRYNAV/cd-eject-server,\
 $WRL_ENTRYNAV/cdserver,\
-$WRL_ENTRYNAV/ceconn,\
+/home/mmes/GITS/ceconn,\
 $WRL_ENTRYNAV/cleanup-service,\
 $WRL_ENTRYNAV/codingapp,\
 $WRL_ENTRYNAV/connectivity,\

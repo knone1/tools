@@ -8,7 +8,7 @@ cp /home/mmes/GITS/multimedia/dist/libauxin-generic/src/src/auxin-perf/CPerforma
 cp /home/mmes/GITS/multimedia/dist/vmost-mmp/src/src/mmp/CSimMultiMediaPlayer.h ./build/vmost-mmp-0.5/src/mmp/CSimMultiMediaPlayer.h
 
 
-make -C build libauxin-generic.clean
+make -C build libauxin-generic.distclean
 make -C build libauxin-generic
 
 

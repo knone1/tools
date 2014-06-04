@@ -1,0 +1,9 @@
+
+
+find "$1" -type f -iname "Makefile.am" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
+#find "$1" -type f -name "*Setting*" -print0 | xargs -0 grep -F -n  "$2"
+#find "$1" -type f -print0 | xargs -0 grep -F -n  "$2"
+
+
+#search . ps_mode_str|awk 'BEGIN{FS=":"}{print $1 " +" $2 " " $3$4$5}'
+

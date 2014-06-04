@@ -7,7 +7,11 @@ cd ~/build
 rm /home/mmes/build/export/RPMS/armv6jel_vfp/vmost-auxin-bt-*
 
 
-cp /home/mmes/GITS/multimedia/dist/vmost-auxin-bt/src/src/CSimAuxiliaryInput.cpp ./build/vmost-auxin-bt-0.3/src/CSimAuxiliaryInput.cpp
+cp /home/mmes/GITS/multimedia/dist/vmost-auxin-bt/src/src/* ./build/vmost-auxin-bt-0.3/src/
+
+#cp -rf /home/mmes/GITS/multimedia/dist/libauxin-player/src/src/* ./build/libauxin-player-1.6/BUILD/libauxin-player-1.6/src/
+
+
 
 make -C build vmost-auxin-bt.clean
 make -C build vmost-auxin-bt

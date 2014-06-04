@@ -10,7 +10,8 @@ DEBUG=0
 FORCE=0
 
 #REPO="ubuntu-bins-pu0314"
-REPO="ubuntu-bins-pu0714"
+#REPO="ubuntu-bins-pu0714"
+REPO="ubuntu-bins-pu1114"
 
 TESTCONNFILE="mmbp-examples-wrlinux-layers-B2.1.0.deb"
 TESTCONNURL="https://ftpbin:Reply.2@itpsmgit1.magnetimarelli.com/ftpbin/outgoing/$REPO/pool/windriver/m"
