@@ -1,0 +1,30 @@
+[core]
+
+[alias]
+	i = log --color --oneline
+	l = log --oneline --color
+	b = branch -a
+	s = show --color
+	root = !pwd
+[color]
+	ui = true
+#[http]
+#	proxy = https://F89339A:XXsszz22!!@10.12.54.4:8080
+[core]
+	editor = vim
+
+[user]
+	name = Axel Haslam
+	email = axelhaslam@hotmail.com
+#[user]
+#	name = Axel Haslam
+#	email = Axel.haslam@magnetimarelli.com
+[sendemail]
+	smtpencryption = tls
+	smtpserver = smtp.gmail.com 
+	smtpuser = axelhaslam@gmail.com
+	smtpserverport = 465
+	chainreplyto = false
+	from = axelhaslam@gmail.com
+	smtppass = 46620986
+
