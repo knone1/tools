@@ -1,51 +1,104 @@
-#Wrote: /home/mmes/build/export/RPMS/armv6jel_vfp/ceconn-D_38.2-1_WR3.0.2ax.armv6jel_vfp-2f1e05c.rpm
-#Wrote: /home/mmes/build/export/RPMS/armv6jel_vfp/ceconn-devel-D_38.2-1_WR3.0.2ax.armv6jel_vfp-2f1e05c.rpm
-#Wrote: /home/mmes/build/export/RPMS/armv6jel_vfp/ceconn-debuginfo-D_38.2-1_WR3.0.2ax.armv6jel_vfp-2f1e05c.rpm
+#!/bin/bash
 
-#/home/mmes/build/export/RPMS/armv6jel_vfp/ceconn-D_38.2-1_WR3.0.2ax.armv6jel_vfp-2f1e05c.rpm
-#Wrote: /home/mmes/build/export/RPMS/armv6jel_vfp/libmtp-1.1.6-1_WR3.0.2ax.armv6jel_vfp-0777c0e.rpm
-#Wrote: /home/mmes/build/export/RPMS/armv6jel_vfp/libmtp-devel-1.1.6-1_WR3.0.2ax.armv6jel_vfp-0777c0e.rpm
-#Wrote: /home/mmes/build/export/RPMS/armv6jel_vfp/libmtp-debuginfo-1.1.6-1_WR3.0.2ax.armv6jel_vfp-0777c0e.rpm
+CMD1=$1
+CMD2=$2
+BUILD_DIR=/home/mmes/dev/builds/entrynav
+CECONN_DIR=/home/mmes/GITS/ceconn
 
+#Personal build location
+RPM_FOLDER="$BUILD_DIR/export/RPMS/armv6jel_vfp/"
 
+#VM install script SCP source - ORIGINAL AKHELA
+PLF_SCRIPT_ORIGINAL_AK="$CECONN_DIR/scripts/installceconnandroid.sh"
+#VM install script SCP source - WITH NEW PLUGIN
+PLF_SCRIPT_ORIGINAL_MM="$CECONN_DIR/scripts/installceconn_mm.sh"
 
+#Platform install script SCP target - ORIGINAL AKHELA
+PLF_SCRIPT_TARGET_AK='/opt/ceconn/bin/installceconnandroid.sh'
+#Platform install script SCP target - WITH NEW PLUGIN
+PLF_SCRIPT_TARGET_MM='/opt/ceconn/bin/installceconn_mm.sh'
 
-if [ -z "$1" ]; then
+cd $BUILD_DIR
 
-cd /home/mmes/build
-rm /home/mmes/build/export/RPMS/armv6jel_vfp/ceconn-*
+#This script is always used to rebuild libmtp and ceconn modules
+echo 'Paths are specific to the person who wrote the script!!!' 
+echo $RPM_FOLDER
+echo 'Run this script from you build folder!!!'
 
-cp -rf /home/mmes/GITS/ceconn/dist/ceconn/src/ /home/mmes/build/build/ceconn-D_38.2/BUILD/ceconn-D_38.2/
+if [[ "$CMD1" == "-b"  || "$CMD2" == "-b" ]]; then 
+	#Remove existing build
+	echo '------------------'
+	echo 'Cleaning libmtp'
+	echo '------------------'
+	make -C build libmtp.distclean
 
+	echo '------------------'
+	echo 'Cleaning ceconn'
+	echo '------------------'
+	rm $RPM_FOLDER/ceconn*.rpm
+	make -C build ceconn.distclean
 
-
-make -C build  libmtp.distclean
-make -C build  ceconn.distclean
-make -C build  ceconn
-
+	echo '------------------'
+	echo 'Rebuilding ceconn'
+	echo '------------------'
+	make -C build ceconn
 fi
 
-FILENAME=`ls /home/mmes/build/export/RPMS/armv6jel_vfp/ceconn-D_38.2-1*|awk 'BEGIN{FS="/"}{print $8}'`
-cd /home/mmes/build
-sshpass -p root ssh root@192.168.0.2 "mount -o rw,remount  /opt;"
- 
-echo "ddd /home/mmes/build/export/RPMS/armv6jel_vfp/$FILENAME"
-cp "/home/mmes/build/export/RPMS/armv6jel_vfp/$FILENAME" "/home/mmes/build/export/RPMS/armv6jel_vfp/ceconn.rpm"
+if [[ "$CMD1" == "-f"  || "$CMD2" == "-f" ]]; then 
+	#Remove existing build
+	echo '------------------'
+	echo 'Copy source ceconn'
+	echo '------------------'
+
+	make -C build ceconn.distclean
+
+	echo '------------------'
+	echo 'Rebuilding ceconn'
+	echo '------------------'
+	make -C build ceconn
+fi
+
+#get RPM names from ls + grep, not devel nor debug versions
+CECONN_RPM_NAME=`ls $RPM_FOLDER | grep ceconn | grep -v debug | grep -v devel`
+LIBMTP_RPM_NAME=`ls $RPM_FOLDER | grep libmtp | grep -v debug | grep -v devel`  
+
+if [[ "$CMD1" == "-i" || "$CMD2" == "-i" ]]; then 
+	echo '-------------------------------'
+	echo 'SCP RPMs into platform /var'
+	echo '-------------------------------'
+	#remove old ones if any
+	sshpass -p 'root' ssh root@192.168.0.2 "rm -rf /var/ceconn.rpm /var/libmtp.rpm"
+
+	echo $CECONN_RPM_NAME
+	sshpass -p 'root' scp $RPM_FOLDER$CECONN_RPM_NAME root@192.168.0.2:/var/ceconn.rpm
+
+	echo $LIBMTP_RPM_NAME
+	sshpass -p 'root' scp $RPM_FOLDER$LIBMTP_RPM_NAME root@192.168.0.2:/var/libmtp.rpm
+
+	echo '-------------------------------'
+	echo 'Remount /opt with write rights'
+	echo '-------------------------------'
+	sshpass -p 'root' ssh root@192.168.0.2 "mount -o rw,remount /opt"
+
+	echo '-------------------------------------------'
+	echo 'SCP the install script to /opt/ceconn/bin'
+	echo '-------------------------------------------'
+	sshpass -p 'root' scp $PLF_SCRIPT_ORIGINAL_MM root@192.168.0.2:$PLF_SCRIPT_TARGET_MM
 
 
-sshpass -p root scp /home/mmes/build/export/RPMS/armv6jel_vfp/ceconn.rpm root@192.168.0.2:/var/ceconn.rpm
-sshpass -p root scp /home/mmes/VMSHARE/IAP/installceconnandroid.sh  root@192.168.0.2:/opt/ceconn/bin
+	echo '-------------------------------'
+	echo 'Launch ceconn install script'
+	echo '-------------------------------'
+	sshpass -p 'root' ssh root@192.168.0.2 "chmod +x $PLF_SCRIPT_TARGET_MM;$PLF_SCRIPT_TARGET_MM /var/ceconn.rpm"
 
-sshpass -p root ssh root@192.168.0.2 "/opt/ceconn/bin/installceconnandroid.sh /var/ceconn.rpm"
+	echo '-------------------------------------'
+	echo 'RPM2CPIO for libmtp - must run from /'
+	echo '-------------------------------------'
+	sshpass -p 'root' ssh root@192.168.0.2 "cd /; mount -o rw,remount /opt;rpm2cpio /var/libmtp.rpm|cpio -imdvu;sync;sync"
 
-sshpass -p root scp /home/mmes/build/export/RPMS/armv6jel_vfp/libmtp-* root@192.168.0.2:/dev/shm
-sshpass -p root ssh root@192.168.0.2 "cd /; rpm2cpio /dev/shm/libmtp-*.rpm|cpio -ivd;sync"
-sync
-#sshpass -p root ssh root@192.168.0.2 "cd /; rpm2cpio /tmp/libauxin-player-debuginfo*.rpm|cpio -ivd;sync"
-PID=`sshpass -p root ssh root@192.168.0.2 "ps|grep ceconn|grep -v sh|head -1" |awk '{print $1}'`
-sshpass -p root ssh root@192.168.0.2 "kill -9 $PID"
-#sshpass -p root ssh root@192.168.0.2 "/opt/ceconn/bin/ceconn"
+	echo '-------------------------------'
+	echo 'PLEASE REBOOT PLATFORM'
+	echo '-------------------------------'
+fi
 
-
-
-
+cd -
