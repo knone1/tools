@@ -1,4 +1,6 @@
-WRL_ENTRYNAV=/bmw117/D14024A/layers
+#!/bin/bash
+
+WRL_ENTRYNAV=/bmw117/E14254A/layers
 WRL_MMBP=/MM_BASE/arm/layers
 
 /MM_BASE/wrlinux/wrlinux-3.0/wrlinux/configure \
@@ -13,7 +15,7 @@ $WRL_ENTRYNAV/audioconnect,\
 $WRL_ENTRYNAV/audioroutingmanager,\
 $WRL_ENTRYNAV/bmw-hmi-2,\
 $WRL_ENTRYNAV/boot-conf,\
-/home/mmes/GITS/cddrv,\
+$WRL_ENTRYNAV/cddrv,\
 $WRL_ENTRYNAV/cd-eject-server,\
 $WRL_ENTRYNAV/cdserver,\
 /home/mmes/GITS/ceconn,\
@@ -33,7 +35,7 @@ $WRL_ENTRYNAV/gps-src,\
 $WRL_ENTRYNAV/harman-share,\
 $WRL_ENTRYNAV/hifituner,\
 $WRL_ENTRYNAV/housekeeping,\
-$WRL_ENTRYNAV/iap,\
+/home/mmes/GITS/iap,\
 $WRL_ENTRYNAV/imc,\
 $WRL_ENTRYNAV/ivi-layer-management,\
 $WRL_ENTRYNAV/kisu,\
