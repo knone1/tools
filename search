@@ -4,6 +4,8 @@ find "$1" -type f -name "*.[chxsS]" -print0 | xargs -0 grep -F -n  "$2" |awk 'BE
 find "$1" -type f -name "*.cpp" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
 
 find "$1" -type f -name "Makefile" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
+find "$1" -type f -name "Kconfig" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
+
 
 #find "$1" -type f -name "*config" -print0 | xargs -0 grep -F -n  "$2"
 #find "$1" -type f -name "*.txt" -print0 | xargs -0 grep -F -n  "$2"
@@ -18,6 +20,8 @@ find "$1" -type f -name "*.mk" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS
 #find "$1" -type f -name "*Setting*" -print0 | xargs -0 grep -F -n  "$2"
 #find "$1" -type f -print0 | xargs -0 grep -F -n  "$2"
 
+find "$1" -type f -name "*.dts" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
+find "$1" -type f -name "*.dtsi" -print0 | xargs -0 grep -F -n  "$2"|awk 'BEGIN{FS=":"}{print "vim "$1 " +" $2 " " $3$4$5}'
 
 #search . ps_mode_str|awk 'BEGIN{FS=":"}{print $1 " +" $2 " " $3$4$5}'
 
